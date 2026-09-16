@@ -13,47 +13,54 @@ class LoginScreen extends StatelessWidget {
       backgroundColor: AppColors.putih,
       body: SafeArea(
         child: Column(
+          
           children: [
             Expanded(
               child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 20),
-                    Image.asset('assets/logo.png', height: 80),
-                    const SizedBox(height: 30),
-                    const CustomTextField(hintText: 'Email or Phone'),
-                    const CustomTextField(hintText: 'password', isPassword: true),
-                    const SizedBox(height: 20),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.biruNavy,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30.0),
+                child: Container(
+                  height: MediaQuery.of(context).size.height,
+                  child: Column(
+            
+                    children: [
+                      const SizedBox(height: 100),
+                      Image.asset('assets/KamiKerjain.png',height: 180,),
+                      const SizedBox(height: 10),
+                      Image.asset('assets/logo.png', height: 100),
+                    
+                      const CustomTextField(hintText: 'Email'),
+                      const CustomTextField(hintText: 'Password', isPassword: true),
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: () {},
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.biruNavy,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30.0),
+                              ),
                             ),
-                          ),
-                          child: const Text(
-                            'Login',
-                            style: TextStyle(color: AppColors.putih, fontSize: 16, fontWeight: FontWeight.bold),
+                            child: const Text(
+                              'Login',
+                              style: TextStyle(color: AppColors.putih, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text(
-                        'Forget password ?',
-                        style: TextStyle(color: AppColors.biruNavy),
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: () {},
+                        child: const Text(
+                          'Forget password ?',
+                          style: TextStyle(color: AppColors.biruNavy),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+                      const SizedBox(height: 50),
+                    ],
+                  ),
                 ),
               ),
             ),

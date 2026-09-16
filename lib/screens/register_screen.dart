@@ -15,38 +15,42 @@ class RegisterScreen extends StatelessWidget {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 60),
-                    Image.asset('assets/logo.png', height: 80),
-                    const SizedBox(height: 40),
-                    const CustomTextField(hintText: 'username'),
-                    const CustomTextField(hintText: 'Email or Phone'),
-                    const CustomTextField(hintText: 'Password', isPassword: true),
-                    const CustomTextField(hintText: 'Confirm Password', isPassword: true),
-                    const SizedBox(height: 20),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.biruNavy,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30.0),
+               
+                child: Container(
+                  height: MediaQuery.of(context).size.height,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 100),
+                      Image.asset('assets/logo.png', height: 100),
+                      const CustomTextField(hintText: 'Username'),
+                      const CustomTextField(hintText: 'Email'),
+                      const CustomTextField(hintText: 'Password', isPassword: true),
+                      const CustomTextField(hintText: 'Confirm Password', isPassword: true),
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: () {},
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.biruNavy,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30.0),
+                              ),
                             ),
-                          ),
-                          child: const Text(
-                            'Buat Akun',
-                            style: TextStyle(color: AppColors.putih, fontSize: 16, fontWeight: FontWeight.bold),
+                            child: const Text(
+                              'Buat Akun',
+                              style: TextStyle(color: AppColors.putih, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 30),
-                  ],
+                      const SizedBox(height: 1000),
+                    ],
+                  ),
                 ),
               ),
             ),
