@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:kami_kerjain/screens/home_screen.dart';
-import 'screens/login_screen.dart';
+
+import 'screens/splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Kami Kerjain',
-      home: const HomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }
