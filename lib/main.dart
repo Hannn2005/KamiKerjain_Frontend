@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-import 'screens/splash_screen.dart';
+import 'utils/routes.dart'; // Import file rute
 
 void main() {
   runApp(const MyApp());
@@ -14,7 +13,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Kami Kerjain',
-      home: const SplashScreen(),
+      initialRoute: AppRoutes.login,
+      routes: AppRoutes.getRoutes(),
     );
   }
 }

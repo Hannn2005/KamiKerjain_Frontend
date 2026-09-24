@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:kami_kerjain/widgets/bottom_navbar.dart';
 import 'package:kami_kerjain/widgets/ai_floating_button.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -30,17 +29,12 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-
-      // =========================
-      // APP BAR
-      // =========================
       appBar: AppBar(
         toolbarHeight: 80,
         backgroundColor: const Color(0xFF00246B),
         elevation: 0,
         title: Row(
           children: [
-            // SEARCH BAR
             Expanded(
               child: Container(
                 height: 40,
@@ -63,10 +57,7 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(width: 15),
-
-            // CHAT CUSTOMER
             const Icon(
               Icons.chat_bubble,
               color: Colors.white,
@@ -75,17 +66,12 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
-
-      // =========================
-      // BODY
-      // =========================
       body: Stack(
         children: [
           GridView.builder(
             physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.all(10),
-            gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
@@ -109,7 +95,6 @@ class HomeScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // IMAGE PLACEHOLDER
                     Container(
                       height: 165,
                       width: double.infinity,
@@ -121,13 +106,10 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                    // SERVICE INFORMATION
                     Padding(
                       padding: const EdgeInsets.all(10),
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             dummy[index]["jasa"],
@@ -136,19 +118,15 @@ class HomeScreen extends StatelessWidget {
                               fontSize: 16,
                             ),
                           ),
-
                           Text(
                             dummy[index]["harga"],
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-
                           const SizedBox(height: 10),
-
                           Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 dummy[index]["seller"],
@@ -156,7 +134,6 @@ class HomeScreen extends StatelessWidget {
                                   color: Colors.grey.withAlpha(150),
                                 ),
                               ),
-
                               Text(
                                 dummy[index]["location"],
                                 style: TextStyle(
@@ -173,18 +150,9 @@ class HomeScreen extends StatelessWidget {
               );
             },
           ),
-
-          // =========================
-          // FLOATING KAMI AI
-          // =========================
           const AiFloatingButton(),
         ],
       ),
-
-      // =========================
-      // BOTTOM NAVIGATION
-      // =========================
-      bottomNavigationBar: const BottomNavbar(),
     );
   }
 }

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:kami_kerjain/screens/home_screen.dart';
-
 import '../utils/colors.dart';
+import '../utils/routes.dart';
 import '../widgets/custom_textfield.dart';
 import '../widgets/auth_footer.dart';
-import 'register_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -26,7 +24,6 @@ class LoginScreen extends StatelessWidget {
                       Image.asset('assets/KamiKerjain.png', height: 180),
                       const SizedBox(height: 10),
                       Image.asset('assets/logo.png', height: 100),
-
                       const CustomTextField(hintText: 'Email'),
                       const CustomTextField(
                         hintText: 'Password',
@@ -40,7 +37,7 @@ class LoginScreen extends StatelessWidget {
                           height: 50,
                           child: ElevatedButton(
                             onPressed: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
+                              Navigator.pushReplacementNamed(context, AppRoutes.mainLayout);
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.biruNavy,
@@ -48,7 +45,6 @@ class LoginScreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(30.0),
                               ),
                             ),
-
                             child: const Text(
                               'Login',
                               style: TextStyle(
@@ -79,12 +75,7 @@ class LoginScreen extends StatelessWidget {
               text: 'Belum punya akun?',
               buttonText: 'Buat Akun',
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const RegisterScreen(),
-                  ),
-                );
+                Navigator.pushNamed(context, AppRoutes.register);
               },
             ),
           ],
