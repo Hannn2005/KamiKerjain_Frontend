@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'utils/routes.dart'; // Import file rute
+import 'utils/routes.dart';
+import 'utils/colors.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,7 +14,17 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Kami Kerjain',
-      initialRoute: AppRoutes.login,
+      theme: ThemeData(
+        colorSchemeSeed: AppColors.biruNavy,
+        useMaterial3: true,
+        scaffoldBackgroundColor: AppColors.putih,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: AppColors.biruNavy,
+          foregroundColor: AppColors.putih,
+          elevation: 0,
+        ),
+      ),
+      initialRoute: AppRoutes.splash,
       routes: AppRoutes.getRoutes(),
     );
   }
