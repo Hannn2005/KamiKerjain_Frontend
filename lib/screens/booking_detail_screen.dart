@@ -63,8 +63,29 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     const SizedBox(height: 4),
                     Text('Catatan: ${booking.notes}'),
                   ],
+                  if (booking.selectedOptions.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    const Text('Layanan Tambahan Terpilih:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.biruNavy)),
+                    const SizedBox(height: 4),
+                    ...booking.selectedOptions.map((opt) => Padding(
+                      padding: const EdgeInsets.only(left: 4.0, bottom: 2.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline, size: 14, color: AppColors.hijauSukses),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(opt, style: const TextStyle(fontSize: 12, color: AppColors.abuText))),
+                        ],
+                      ),
+                    )),
+                  ],
                   const SizedBox(height: 12),
-                  Text(formatRupiah(booking.price), style: const TextStyle(fontSize: 18, color: AppColors.kuningLogo, fontWeight: FontWeight.bold)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(formatRupiah(booking.price), style: const TextStyle(fontSize: 18, color: AppColors.kuningLogo, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ],
               ),
             ),

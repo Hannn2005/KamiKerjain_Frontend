@@ -6,7 +6,11 @@ class BookingModel {
   final String customerName;
   final String penyediaId;
   final String penyediaName;
-  final double price;
+  final double price; // Total price
+  final double basePrice; // Base price of the service
+  final List<String> selectedOptions; // List of selected add-on titles
+  final double optionsTotalPrice; // Sum of selected add-ons
+  final String? priceNote; // Note about dynamic pricing / estimation
   final String status; // 'pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled'
   final String? notes;
   final String? reviewText;
@@ -23,6 +27,10 @@ class BookingModel {
     required this.penyediaId,
     required this.penyediaName,
     required this.price,
+    this.basePrice = 0.0,
+    this.selectedOptions = const [],
+    this.optionsTotalPrice = 0.0,
+    this.priceNote,
     required this.status,
     this.notes,
     this.reviewText,
@@ -41,6 +49,10 @@ class BookingModel {
       'penyediaId': penyediaId,
       'penyediaName': penyediaName,
       'price': price,
+      'basePrice': basePrice,
+      'selectedOptions': selectedOptions,
+      'optionsTotalPrice': optionsTotalPrice,
+      'priceNote': priceNote,
       'status': status,
       'notes': notes,
       'reviewText': reviewText,
@@ -51,6 +63,12 @@ class BookingModel {
   }
 
   factory BookingModel.fromMap(Map<String, dynamic> map) {
+    var rawOptions = map['selectedOptions'];
+    List<String> optionsList = [];
+    if (rawOptions is List) {
+      optionsList = rawOptions.map((e) => e.toString()).toList();
+    }
+
     return BookingModel(
       id: map['id'] ?? '',
       jasaId: map['jasaId'] ?? '',
@@ -60,6 +78,10 @@ class BookingModel {
       penyediaId: map['penyediaId'] ?? '',
       penyediaName: map['penyediaName'] ?? '',
       price: map['price']?.toDouble() ?? 0.0,
+      basePrice: map['basePrice']?.toDouble() ?? (map['price']?.toDouble() ?? 0.0),
+      selectedOptions: optionsList,
+      optionsTotalPrice: map['optionsTotalPrice']?.toDouble() ?? 0.0,
+      priceNote: map['priceNote'],
       status: map['status'] ?? 'pending',
       notes: map['notes'],
       reviewText: map['reviewText'],

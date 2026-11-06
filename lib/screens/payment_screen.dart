@@ -67,18 +67,42 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   const Divider(),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(widget.booking.jasaTitle),
-                    trailing: Text(formatRupiah(widget.booking.price)),
+                    title: Text(widget.booking.jasaTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: widget.booking.priceNote != null ? Text('Skema: ${widget.booking.priceNote}') : null,
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Biaya Admin'),
+                    title: const Text('Biaya Dasar Layanan'),
+                    trailing: Text(formatRupiah(widget.booking.basePrice > 0 ? widget.booking.basePrice : widget.booking.price)),
+                  ),
+                  if (widget.booking.selectedOptions.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    const Text('Layanan Tambahan Terpilih:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.biruNavy)),
+                    ...widget.booking.selectedOptions.map((opt) => Padding(
+                      padding: const EdgeInsets.only(left: 8.0, top: 4.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, size: 14, color: AppColors.hijauSukses),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(opt, style: const TextStyle(fontSize: 12, color: AppColors.abuText))),
+                        ],
+                      ),
+                    )),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Subtotal Tambahan'),
+                      trailing: Text('+ ${formatRupiah(widget.booking.optionsTotalPrice)}', style: const TextStyle(color: AppColors.hijauSukses)),
+                    ),
+                  ],
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Biaya Layanan & Admin'),
                     trailing: Text(formatRupiah(adminFee)),
                   ),
                   const Divider(),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                    title: const Text('Total Pembayaran', style: TextStyle(fontWeight: FontWeight.bold)),
                     trailing: Text(formatRupiah(total), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.kuningLogo, fontSize: 18)),
                   ),
                 ],

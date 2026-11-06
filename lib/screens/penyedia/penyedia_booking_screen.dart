@@ -127,6 +127,24 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
                 Text('Tanggal: ${b.createdAt.toLocal().toString().split(' ')[0]}', style: const TextStyle(color: AppColors.abuText)),
                 const SizedBox(height: 8),
                 Text(formatRupiah(b.price), style: const TextStyle(color: AppColors.hijauSukses, fontWeight: FontWeight.bold, fontSize: 16)),
+                if (b.selectedOptions.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.biruMuda.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Opsi / Add-on yang dipilih klien:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.biruNavy)),
+                        const SizedBox(height: 4),
+                        ...b.selectedOptions.map((opt) => Text('• $opt', style: const TextStyle(fontSize: 11, color: AppColors.biruNavy))),
+                      ],
+                    ),
+                  ),
+                ],
                 if (b.notes != null && b.notes!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text('Catatan: ${b.notes}', style: const TextStyle(fontStyle: FontStyle.italic)),

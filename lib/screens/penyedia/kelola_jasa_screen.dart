@@ -105,7 +105,11 @@ class _KelolaJasaScreenState extends State<KelolaJasaScreen> {
                                 const SizedBox(height: 4),
                                 Text(jasa.category, style: const TextStyle(color: AppColors.abuText)),
                                 const SizedBox(height: 4),
-                                Text(formatRupiah(jasa.price), style: const TextStyle(color: AppColors.hijauSukses, fontWeight: FontWeight.bold)),
+                                Text('${jasa.formattedPriceType} ${formatRupiah(jasa.price)} ${jasa.priceUnit}', style: const TextStyle(color: AppColors.hijauSukses, fontWeight: FontWeight.bold, fontSize: 13)),
+                                if (jasa.options.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text('${jasa.options.length} Opsi Tambahan Terdaftar', style: const TextStyle(color: AppColors.biruNavy, fontSize: 11, fontWeight: FontWeight.w600)),
+                                ],
                               ],
                             ),
                           ),

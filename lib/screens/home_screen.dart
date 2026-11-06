@@ -188,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      mainAxisExtent: 270,
+                      mainAxisExtent: 280,
                     ),
                     itemCount: _filteredJasa.length,
                     itemBuilder: (context, index) {
@@ -256,8 +256,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      formatRupiah(jasa.price),
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.biruNavy),
+                                      '${jasa.formattedPriceType} ${formatRupiah(jasa.price)}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.biruNavy, fontSize: 13),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 8),
                                     Row(

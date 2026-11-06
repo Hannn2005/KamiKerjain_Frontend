@@ -1,3 +1,31 @@
+class JasaOption {
+  final String id;
+  final String title;
+  final double price;
+
+  JasaOption({
+    required this.id,
+    required this.title,
+    required this.price,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'price': price,
+    };
+  }
+
+  factory JasaOption.fromMap(Map<String, dynamic> map) {
+    return JasaOption(
+      id: map['id'] ?? '',
+      title: map['title'] ?? '',
+      price: (map['price'] ?? 0.0).toDouble(),
+    );
+  }
+}
+
 class JasaModel {
   final String id;
   final String penyediaId;
@@ -5,7 +33,10 @@ class JasaModel {
   final String title;
   final String description;
   final String category;
-  final double price;
+  final double price; // Base price / starting price
+  final String priceType; // 'starting_from', 'fixed', 'hourly', 'survey'
+  final String priceUnit; // e.g., '/ proyek', '/ jam', '/ sesi', '/ tugas'
+  final List<JasaOption> options; // Dynamic add-ons/options
   final String location;
   final String? imageUrl;
   final double rating;
@@ -21,6 +52,9 @@ class JasaModel {
     required this.description,
     required this.category,
     required this.price,
+    this.priceType = 'starting_from',
+    this.priceUnit = '/ proyek',
+    this.options = const [],
     required this.location,
     this.imageUrl,
     this.rating = 0.0,
@@ -28,6 +62,20 @@ class JasaModel {
     this.isActive = true,
     required this.createdAt,
   });
+
+  String get formattedPriceType {
+    switch (priceType) {
+      case 'starting_from':
+        return 'Mulai dari';
+      case 'hourly':
+        return 'Per Jam';
+      case 'survey':
+        return 'Estimasi Survey';
+      case 'fixed':
+      default:
+        return 'Harga Pas';
+    }
+  }
 
   JasaModel copyWith({
     String? id,
@@ -37,6 +85,9 @@ class JasaModel {
     String? description,
     String? category,
     double? price,
+    String? priceType,
+    String? priceUnit,
+    List<JasaOption>? options,
     String? location,
     String? imageUrl,
     double? rating,
@@ -52,6 +103,9 @@ class JasaModel {
       description: description ?? this.description,
       category: category ?? this.category,
       price: price ?? this.price,
+      priceType: priceType ?? this.priceType,
+      priceUnit: priceUnit ?? this.priceUnit,
+      options: options ?? this.options,
       location: location ?? this.location,
       imageUrl: imageUrl ?? this.imageUrl,
       rating: rating ?? this.rating,
@@ -70,6 +124,9 @@ class JasaModel {
       'description': description,
       'category': category,
       'price': price,
+      'priceType': priceType,
+      'priceUnit': priceUnit,
+      'options': options.map((o) => o.toMap()).toList(),
       'location': location,
       'imageUrl': imageUrl,
       'rating': rating,
@@ -80,6 +137,12 @@ class JasaModel {
   }
 
   factory JasaModel.fromMap(Map<String, dynamic> map) {
+    var rawOptions = map['options'];
+    List<JasaOption> optionsList = [];
+    if (rawOptions is List) {
+      optionsList = rawOptions.map((item) => JasaOption.fromMap(item)).toList();
+    }
+
     return JasaModel(
       id: map['id'] ?? '',
       penyediaId: map['penyediaId'] ?? '',
@@ -88,6 +151,9 @@ class JasaModel {
       description: map['description'] ?? '',
       category: map['category'] ?? '',
       price: map['price']?.toDouble() ?? 0.0,
+      priceType: map['priceType'] ?? 'starting_from',
+      priceUnit: map['priceUnit'] ?? '/ proyek',
+      options: optionsList,
       location: map['location'] ?? '',
       imageUrl: map['imageUrl'],
       rating: map['rating']?.toDouble() ?? 0.0,

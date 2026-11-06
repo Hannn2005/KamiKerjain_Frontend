@@ -166,7 +166,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      formatRupiah(jasa.price),
+                                      '${jasa.formattedPriceType} ${formatRupiah(jasa.price)}',
                                       style: const TextStyle(color: AppColors.kuningLogo, fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(height: 4),
