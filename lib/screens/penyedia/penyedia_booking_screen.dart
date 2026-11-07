@@ -4,6 +4,7 @@ import 'package:kami_kerjain/services/auth_service.dart';
 import 'package:kami_kerjain/services/booking_service.dart';
 import 'package:kami_kerjain/utils/colors.dart';
 import 'package:kami_kerjain/utils/helpers.dart';
+import 'package:kami_kerjain/screens/chat_detail_screen.dart';
 
 class PenyediaBookingScreen extends StatefulWidget {
   const PenyediaBookingScreen({Key? key}) : super(key: key);
@@ -50,15 +51,88 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
             onPressed: () => Navigator.pop(context),
             child: const Text('Batal', style: TextStyle(color: AppColors.abuText)),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               _updateBookingStatus(bookingId, newStatus);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status berhasil diperbarui')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Status pesanan berhasil diperbarui')));
             },
             child: const Text('Ya', style: TextStyle(color: AppColors.biruNavy)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showCancelActiveOrderDialog(BookingModel booking) {
+    String selectedReason = 'Kondisi di lokasi tidak sesuai dengan deskripsi pesanan';
+    final List<String> cancelReasons = [
+      'Kondisi di lokasi tidak sesuai dengan deskripsi pesanan',
+      'Permintaan pembeli di luar cakupan pekerjaan awal',
+      'Pembeli menolak penyesuaian biaya tambahan',
+      'Kendala teknis / darurat di lokasi',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppColors.merahError),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Batalkan Pesanan Ini?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.merahError)),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Gunakan fitur ini jika kondisi aktual di lokasi berbeda dari pesanan atau pembeli meminta pekerjaan di luar kesepakatan:',
+                style: TextStyle(fontSize: 12, color: AppColors.abuText),
+              ),
+              const SizedBox(height: 12),
+              const Text('Pilih Alasan Pembatalan:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 6),
+              ...cancelReasons.map((reason) => RadioListTile<String>(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(reason, style: const TextStyle(fontSize: 12)),
+                value: reason,
+                groupValue: selectedReason,
+                activeColor: AppColors.merahError,
+                onChanged: (val) {
+                  if (val != null) {
+                    setDialogState(() => selectedReason = val);
+                  }
+                },
+              )).toList(),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Kembali', style: TextStyle(color: AppColors.abuText)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _updateBookingStatus(booking.id, 'cancelled');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Pesanan dibatalkan. Alasan: "$selectedReason"'),
+                    backgroundColor: AppColors.merahError,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.merahError),
+              child: const Text('Ya, Batalkan Pesanan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -72,7 +146,7 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
     return Scaffold(
       backgroundColor: AppColors.abuMuda,
       appBar: AppBar(
-        title: const Text('Daftar Booking', style: TextStyle(color: AppColors.putih)),
+        title: const Text('Daftar Booking Masuk', style: TextStyle(color: AppColors.putih)),
         backgroundColor: AppColors.biruNavy,
         bottom: TabBar(
           controller: _tabController,
@@ -118,7 +192,9 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(b.jasaTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Expanded(
+                      child: Text(b.jasaTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
                     Text(b.status.toUpperCase(), style: TextStyle(color: _getStatusColor(b.status), fontWeight: FontWeight.bold, fontSize: 12)),
                   ],
                 ),
@@ -147,9 +223,11 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
                 ],
                 if (b.notes != null && b.notes!.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Text('Catatan: ${b.notes}', style: const TextStyle(fontStyle: FontStyle.italic)),
+                  Text('Catatan Klien: ${b.notes}', style: const TextStyle(fontStyle: FontStyle.italic)),
                 ],
                 const SizedBox(height: 12),
+                
+                // ACTION BUTTONS: MENUNGGU
                 if (isMenunggu)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -167,15 +245,51 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
                       ),
                     ],
                   ),
+
+                // ACTION BUTTONS: AKTIF (Termasuk Chat Klien & Batalkan jika tidak cocok di lapangan)
                 if (isAktif)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton(
-                      onPressed: () => _showConfirmationDialog(b.id, 'Selesaikan Booking', 'Tandai booking ini sebagai selesai?', 'completed'),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.kuningLogo),
-                      child: const Text('Selesaikan', style: TextStyle(color: AppColors.biruNavy, fontWeight: FontWeight.bold)),
-                    ),
-                  )
+                  Column(
+                    children: [
+                      const Divider(),
+                      Row(
+                        children: [
+                          // Tombol Chat Klien
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatDetailScreen(
+                                    chatRoomId: 'chat_${b.id}',
+                                    otherUserName: b.customerName,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.chat_outlined, size: 16, color: AppColors.biruNavy),
+                            label: const Text('Chat Klien', style: TextStyle(color: AppColors.biruNavy, fontSize: 12)),
+                            style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                          ),
+                          const Spacer(),
+                          // Tombol Batalkan jika tidak sesuai lapangan
+                          TextButton(
+                            onPressed: () => _showCancelActiveOrderDialog(b),
+                            child: const Text('Batalkan (Tidak Sesuai)', style: TextStyle(color: AppColors.merahError, fontSize: 12)),
+                          ),
+                          const SizedBox(width: 4),
+                          // Tombol Selesaikan Pekerjaan
+                          ElevatedButton(
+                            onPressed: () => _showConfirmationDialog(b.id, 'Selesaikan Booking', 'Tandai booking ini sebagai selesai?', 'completed'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.kuningLogo,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            child: const Text('Selesaikan', style: TextStyle(color: AppColors.biruNavy, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),

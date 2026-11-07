@@ -42,9 +42,62 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (success) {
       final user = AuthService().currentUser;
-      if (user?.role == 'penyedia') {
-        Navigator.pushReplacementNamed(context, AppRoutes.penyediaMainLayout);
+      if (user?.role == 'admin') {
+        // Direct route to Admin Dashboard
+        Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
+      } else if (user?.role == 'penyedia') {
+        if (user?.status == 'pending') {
+          AuthService().logout();
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.hourglass_top, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('Akun Sedang Diverifikasi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.biruNavy)),
+                ],
+              ),
+              content: const Text(
+                'Pendaftaran akun Anda sebagai Penyedia Jasa saat ini sedang dalam proses verifikasi oleh Admin KamiKerjain.\n\n'
+                'Admin sedang meninjau berkas CV dan bukti pekerjaan Anda. Silakan hubungi admin atau login kembali setelah akun disetujui.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Mengerti', style: TextStyle(color: AppColors.biruNavy, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        } else if (user?.status == 'rejected') {
+          final reason = user?.rejectionReason ?? 'Dokumen CV/Portofolio belum memenuhi standar kualifikasi';
+          AuthService().logout();
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.cancel, color: AppColors.merahError),
+                  SizedBox(width: 8),
+                  Text('Pendaftaran Ditolak', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.merahError)),
+                ],
+              ),
+              content: Text('Mohon maaf, pengajuan akun mitra Anda ditolak oleh Admin dengan alasan:\n\n"$reason"'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Tutup', style: TextStyle(color: AppColors.biruNavy)),
+                ),
+              ],
+            ),
+          );
+        } else {
+          // Approved provider
+          Navigator.pushReplacementNamed(context, AppRoutes.penyediaMainLayout);
+        }
       } else {
+        // Customer
         Navigator.pushReplacementNamed(context, AppRoutes.mainLayout);
       }
     } else {
@@ -70,11 +123,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      SizedBox(height: MediaQuery.of(context).size.height * 0.08),
-                      Image.asset('assets/KamiKerjain.png', height: 150),
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.06),
+                      Image.asset('assets/KamiKerjain.png', height: 140),
                       const SizedBox(height: 8),
-                      Image.asset('assets/logo.png', height: 80),
-                      const SizedBox(height: 24),
+                      Image.asset('assets/logo.png', height: 70),
+                      const SizedBox(height: 20),
                       CustomTextField(
                         hintText: 'Email',
                         controller: _emailController,
@@ -163,32 +216,39 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: TextStyle(color: AppColors.biruNavy),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      // Hint akun testing
+                      const SizedBox(height: 14),
+
+                      // Hint akun testing termasuk ADMIN & PENYEDIA PENDING
                       Container(
                         margin: const EdgeInsets.symmetric(horizontal: 24),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: AppColors.biruNavy.withOpacity(0.05),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.biruNavy.withOpacity(0.1)),
+                          border: Border.all(color: AppColors.biruNavy.withOpacity(0.12)),
                         ),
-                        child: const Column(
-                          children: [
-                            Text(
-                              'Akun Testing:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: AppColors.biruNavy,
-                              ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Row(
+                              children: [
+                                Icon(Icons.info_outline, size: 16, color: AppColors.biruNavy),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Akun Uji Coba Demo:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: AppColors.biruNavy,
+                                  ),
+                                ),
+                              ],
                             ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Customer: customer@test.com / 123456\nPenyedia: penyedia@test.com / 123456',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 11, color: Colors.grey),
-                            ),
+                            SizedBox(height: 6),
+                            Text('• Admin (Acc Mitra): admin@kamikerjain.com / admin123', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.purple)),
+                            Text('• Calon Mitra (Pending): calon_mitra@test.com / 123456', style: TextStyle(fontSize: 11, color: Colors.deepOrange)),
+                            Text('• Penyedia Aktif: penyedia@test.com / 123456', style: TextStyle(fontSize: 11, color: AppColors.biruNavy)),
+                            Text('• Customer: customer@test.com / 123456', style: TextStyle(fontSize: 11, color: Colors.black87)),
                           ],
                         ),
                       ),

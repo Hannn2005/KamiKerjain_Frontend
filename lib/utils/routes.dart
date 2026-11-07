@@ -10,6 +10,7 @@ import '../screens/transaction_screen.dart';
 import '../screens/ai_resume_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/penyedia/penyedia_main_layout.dart';
+import '../screens/admin/admin_dashboard_screen.dart';
 
 class AppRoutes {
   static const String splash = '/splash';
@@ -17,6 +18,7 @@ class AppRoutes {
   static const String register = '/register';
   static const String mainLayout = '/mainLayout';
   static const String penyediaMainLayout = '/penyediaMainLayout';
+  static const String adminDashboard = '/adminDashboard';
   static const String search = '/search';
   static const String chatList = '/chatList';
   static const String notification = '/notification';
@@ -32,6 +34,7 @@ class AppRoutes {
       register: (context) => const RegisterScreen(),
       mainLayout: (context) => const MainLayout(),
       penyediaMainLayout: (context) => const PenyediaMainLayout(),
+      adminDashboard: (context) => const AdminDashboardScreen(),
       search: (context) => const SearchScreen(),
       chatList: (context) => const ChatListScreen(),
       notification: (context) => const NotificationScreen(),
