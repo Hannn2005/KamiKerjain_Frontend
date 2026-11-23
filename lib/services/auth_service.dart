@@ -6,8 +6,7 @@ class AuthService {
   AuthService._internal();
 
   UserModel? currentUser;
-  final String _uuid = DateTime.now().millisecondsSinceEpoch.toString();
-
+  
   final List<UserModel> _users = [
     // 1. Akun Tetap Admin
     UserModel(
@@ -186,6 +185,18 @@ class AuthService {
         currentUser = _users[idx];
       }
     }
+  }
+
+  /// Admin menghapus pengguna. Akun admin dan akun yang sedang login
+  /// tidak boleh dihapus. Mengembalikan true jika berhasil.
+  bool deleteUser(String userId) {
+    final idx = _users.indexWhere((u) => u.id == userId);
+    if (idx == -1) return false;
+    final target = _users[idx];
+    if (target.role == 'admin' || target.id == currentUser?.id) return false;
+    _users.removeAt(idx);
+    _userPasswords.remove(target.email);
+    return true;
   }
 
   void logout() {

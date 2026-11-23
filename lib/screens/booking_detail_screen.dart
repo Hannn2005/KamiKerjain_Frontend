@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/booking_model.dart';
 import '../utils/colors.dart';
 import '../utils/helpers.dart';
+import '../services/booking_service.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   final BookingModel booking;
@@ -14,10 +15,59 @@ class BookingDetailScreen extends StatefulWidget {
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
   double _rating = 0;
   final _reviewController = TextEditingController();
+  late BookingModel _booking;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ambil versi terbaru dari service (status bisa saja sudah berubah)
+    _booking = BookingService().getBookingById(widget.booking.id) ?? widget.booking;
+  }
+
+  @override
+  void dispose() {
+    _reviewController.dispose();
+    super.dispose();
+  }
+
+  void _confirmCancel() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Batalkan Pesanan?', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.merahError)),
+        content: Text('Pesanan "${_booking.jasaTitle}" akan dibatalkan. Tindakan ini tidak dapat diurungkan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Kembali', style: TextStyle(color: AppColors.abuText)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              final ok = BookingService().cancelBookingByCustomer(_booking.id);
+              setState(() {
+                _booking = BookingService().getBookingById(_booking.id) ?? _booking;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(ok
+                      ? 'Pesanan berhasil dibatalkan'
+                      : 'Pesanan tidak dapat dibatalkan karena sudah diproses penyedia'),
+                  backgroundColor: ok ? AppColors.hijauSukses : AppColors.merahError,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.merahError),
+            child: const Text('Ya, Batalkan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final booking = widget.booking;
+    final booking = _booking;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detail Transaksi', style: TextStyle(color: Colors.white)),
@@ -102,15 +152,34 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 children: [
                   const Text('Status Pekerjaan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.biruNavy)),
                   const SizedBox(height: 12),
-                  _buildStatusStep('Menunggu', 'pending', booking.status),
-                  _buildStatusStep('Diterima', 'accepted', booking.status),
-                  _buildStatusStep('Dikerjakan', 'in_progress', booking.status),
-                  _buildStatusStep('Selesai', 'completed', booking.status),
+                  if (booking.status == 'cancelled' || booking.status == 'rejected')
+                    Text(
+                      booking.status == 'cancelled' ? 'Pesanan ini telah dibatalkan.' : 'Pesanan ini ditolak oleh penyedia.',
+                      style: const TextStyle(color: AppColors.abuText),
+                    )
+                  else ...[
+                    _buildStatusStep('Menunggu', 'pending', booking.status),
+                    _buildStatusStep('Diterima', 'accepted', booking.status),
+                    _buildStatusStep('Dikerjakan', 'in_progress', booking.status),
+                    _buildStatusStep('Selesai', 'completed', booking.status),
+                  ],
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
+
+          // Tombol batalkan: hanya saat status masih menunggu
+          if (booking.status == 'pending')
+            OutlinedButton.icon(
+              onPressed: _confirmCancel,
+              icon: const Icon(Icons.cancel_outlined, color: AppColors.merahError),
+              label: const Text('Batalkan Pesanan', style: TextStyle(color: AppColors.merahError, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.merahError),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
 
           // Review section for completed bookings
           if (booking.status == 'completed' && booking.reviewRating == null)
