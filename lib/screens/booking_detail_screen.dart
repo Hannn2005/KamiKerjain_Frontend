@@ -3,6 +3,7 @@ import '../models/booking_model.dart';
 import '../utils/colors.dart';
 import '../utils/helpers.dart';
 import '../services/booking_service.dart';
+import '../services/api_client.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   final BookingModel booking;
@@ -20,8 +21,19 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // Ambil versi terbaru dari service (status bisa saja sudah berubah)
-    _booking = BookingService().getBookingById(widget.booking.id) ?? widget.booking;
+    _booking = widget.booking;
+    _refresh();
+  }
+
+  /// Ambil versi terbaru dari server (status bisa saja sudah berubah).
+  Future<void> _refresh() async {
+    try {
+      final latest = await BookingService().getBookingById(widget.booking.id);
+      if (!mounted) return;
+      setState(() => _booking = latest);
+    } on ApiException {
+      // Pakai data yang sudah ada jika gagal memuat ulang.
+    }
   }
 
   @override
@@ -42,20 +54,25 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             child: const Text('Kembali', style: TextStyle(color: AppColors.abuText)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              final ok = BookingService().cancelBookingByCustomer(_booking.id);
-              setState(() {
-                _booking = BookingService().getBookingById(_booking.id) ?? _booking;
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ok
-                      ? 'Pesanan berhasil dibatalkan'
-                      : 'Pesanan tidak dapat dibatalkan karena sudah diproses penyedia'),
-                  backgroundColor: ok ? AppColors.hijauSukses : AppColors.merahError,
-                ),
-              );
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                final updated = await BookingService().cancelBooking(_booking.id);
+                if (!mounted) return;
+                setState(() => _booking = updated);
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Pesanan berhasil dibatalkan'),
+                    backgroundColor: AppColors.hijauSukses,
+                  ),
+                );
+              } on ApiException catch (e) {
+                await _refresh();
+                messenger.showSnackBar(
+                  SnackBar(content: Text(e.message), backgroundColor: AppColors.merahError),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.merahError),
             child: const Text('Ya, Batalkan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -309,11 +326,21 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               child: const Text('Batal'),
             ),
             ElevatedButton(
-              onPressed: () {
-                if (_rating > 0) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(this.context).showSnackBar(
+              onPressed: () async {
+                if (_rating <= 0) return;
+                Navigator.pop(context);
+                final messenger = ScaffoldMessenger.of(this.context);
+                try {
+                  final updated = await BookingService()
+                      .addReview(_booking.id, _rating, _reviewController.text.trim());
+                  if (!mounted) return;
+                  setState(() => _booking = updated);
+                  messenger.showSnackBar(
                     const SnackBar(content: Text('Review berhasil dikirim!'), backgroundColor: Colors.green),
+                  );
+                } on ApiException catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text(e.message), backgroundColor: AppColors.merahError),
                   );
                 }
               },
