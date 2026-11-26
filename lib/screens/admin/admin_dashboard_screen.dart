@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/jasa_service.dart';
 import '../../utils/colors.dart';
-import '../../utils/helpers.dart';
 import '../../utils/routes.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -183,6 +183,46 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Tutup', style: TextStyle(color: AppColors.biruNavy)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteUserDialog(UserModel user) {
+    final isProvider = user.role == 'penyedia';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Pengguna?', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.merahError)),
+        content: Text(
+          'Akun "${user.username}" (${user.email}) akan dihapus permanen dan tidak bisa login lagi.'
+          '${isProvider ? '\n\nSemua jasa milik penyedia ini juga akan ikut dihapus.' : ''}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: AppColors.abuText)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              final ok = _authService.deleteUser(user.id);
+              if (ok && isProvider) {
+                JasaService().deleteJasaByPenyedia(user.id);
+              }
+              _loadData();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(ok
+                      ? 'Pengguna "${user.username}" berhasil dihapus'
+                      : 'Pengguna ini tidak dapat dihapus'),
+                  backgroundColor: ok ? AppColors.hijauSukses : AppColors.merahError,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.merahError),
+            child: const Text('Hapus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -426,10 +466,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             ),
             title: Text(p.username, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('${p.category ?? "Penyedia Jasa"} • ${p.email}'),
-            trailing: const Chip(
-              label: Text('Aktif', style: TextStyle(color: Colors.white, fontSize: 11)),
-              backgroundColor: AppColors.hijauSukses,
-              visualDensity: VisualDensity.compact,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Chip(
+                  label: Text('Aktif', style: TextStyle(color: Colors.white, fontSize: 11)),
+                  backgroundColor: AppColors.hijauSukses,
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: AppColors.merahError),
+                  tooltip: 'Hapus pengguna',
+                  onPressed: () => _showDeleteUserDialog(p),
+                ),
+              ],
             ),
           ),
         );
@@ -454,16 +504,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           child: ListTile(
             title: Text(u.username, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('${u.email} • Status: ${u.status.toUpperCase()}'),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: roleColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                u.role.toUpperCase(),
-                style: TextStyle(color: roleColor, fontWeight: FontWeight.bold, fontSize: 11),
-              ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: roleColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    u.role.toUpperCase(),
+                    style: TextStyle(color: roleColor, fontWeight: FontWeight.bold, fontSize: 11),
+                  ),
+                ),
+                // Akun admin tidak bisa dihapus
+                if (u.role != 'admin')
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: AppColors.merahError),
+                    tooltip: 'Hapus pengguna',
+                    onPressed: () => _showDeleteUserDialog(u),
+                  ),
+              ],
             ),
           ),
         );

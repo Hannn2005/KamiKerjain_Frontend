@@ -5,7 +5,8 @@ class JasaService {
   factory JasaService() => _instance;
   JasaService._internal();
 
-  final String _uuid = DateTime.now().millisecondsSinceEpoch.toString();
+  int _counter = 0;
+  String _newId() => 'jasa_${DateTime.now().millisecondsSinceEpoch}_${_counter++}';
 
   final List<JasaModel> _allJasa = [
     JasaModel(
@@ -237,7 +238,7 @@ class JasaService {
   }
 
   void addJasa(JasaModel jasa) {
-    final newJasa = jasa.copyWith(id: _uuid, createdAt: DateTime.now());
+    final newJasa = jasa.copyWith(id: _newId(), createdAt: DateTime.now());
     _allJasa.add(newJasa);
   }
 
@@ -249,10 +250,11 @@ class JasaService {
   }
 
   void deleteJasa(String id) {
-    // Soft delete / disable
-    final index = _allJasa.indexWhere((j) => j.id == id);
-    if (index != -1) {
-      _allJasa[index] = _allJasa[index].copyWith(isActive: false);
-    }
+    _allJasa.removeWhere((j) => j.id == id);
+  }
+
+  /// Menghapus semua jasa milik satu penyedia (dipakai saat akun penyedia dihapus admin).
+  void deleteJasaByPenyedia(String penyediaId) {
+    _allJasa.removeWhere((j) => j.penyediaId == penyediaId);
   }
 }

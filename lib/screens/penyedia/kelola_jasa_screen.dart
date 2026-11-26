@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kami_kerjain/models/jasa_model.dart';
 import 'package:kami_kerjain/services/auth_service.dart';
 import 'package:kami_kerjain/services/jasa_service.dart';
+import 'package:kami_kerjain/services/booking_service.dart';
 import 'package:kami_kerjain/utils/colors.dart';
 import 'package:kami_kerjain/utils/helpers.dart';
 import 'package:kami_kerjain/screens/penyedia/tambah_jasa_screen.dart';
@@ -34,11 +35,33 @@ class _KelolaJasaScreenState extends State<KelolaJasaScreen> {
   }
 
   void _confirmDelete(JasaModel jasa) {
+    // Jasa yang masih punya pesanan berjalan tidak boleh dihapus
+    if (BookingService().hasActiveBookingForJasa(jasa.id)) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Jasa Tidak Dapat Dihapus'),
+          content: Text(
+            'Jasa "${jasa.title}" masih memiliki pesanan yang sedang berjalan. '
+            'Selesaikan atau tolak pesanan tersebut terlebih dahulu.\n\n'
+            'Jika hanya ingin menyembunyikannya, nonaktifkan jasa dengan switch.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Mengerti', style: TextStyle(color: AppColors.biruNavy)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Hapus Jasa'),
-        content: Text('Yakin ingin menghapus jasa "${jasa.title}"?'),
+        content: Text('Yakin ingin menghapus jasa "${jasa.title}"? Jasa akan dihapus permanen.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -122,6 +145,11 @@ class _KelolaJasaScreenState extends State<KelolaJasaScreen> {
                                   _jasaService.updateJasa(jasa.copyWith(isActive: value));
                                   _loadJasa();
                                 },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: AppColors.merahError),
+                                tooltip: 'Hapus jasa',
+                                onPressed: () => _confirmDelete(jasa),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.edit, color: AppColors.biruNavy),

@@ -38,7 +38,7 @@ class NotificationScreen extends StatelessWidget {
                   final notif = notifications[index];
                   final unread = notif['unread'] as bool;
                   return Container(
-                    color: unread ? AppColors.kuningMuda?.withOpacity(0.3) : Colors.transparent,
+                    color: unread ? AppColors.kuningMuda.withValues(alpha: 0.3) : Colors.transparent,
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: notif['type'] == 'success' ? AppColors.hijauSukses : AppColors.biruMuda,

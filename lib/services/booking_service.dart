@@ -5,13 +5,16 @@ class BookingService {
   factory BookingService() => _instance;
   BookingService._internal();
 
-  final String _uuid = DateTime.now().millisecondsSinceEpoch.toString();
+  int _counter = 0;
+  String _newId() => 'bkg_${DateTime.now().millisecondsSinceEpoch}_${_counter++}';
 
   final List<BookingModel> _bookings = [];
 
-  void createBooking(BookingModel booking) {
+  /// Membuat booking baru dan mengembalikan booking yang tersimpan
+  /// (dengan ID unik) agar bisa dipakai di layar berikutnya (mis. pembayaran).
+  BookingModel createBooking(BookingModel booking) {
     final newBooking = BookingModel(
-      id: _uuid,
+      id: _newId(),
       jasaId: booking.jasaId,
       jasaTitle: booking.jasaTitle,
       customerId: booking.customerId,
@@ -19,11 +22,16 @@ class BookingService {
       penyediaId: booking.penyediaId,
       penyediaName: booking.penyediaName,
       price: booking.price,
+      basePrice: booking.basePrice,
+      selectedOptions: booking.selectedOptions,
+      optionsTotalPrice: booking.optionsTotalPrice,
+      priceNote: booking.priceNote,
       status: 'pending',
       notes: booking.notes,
       createdAt: DateTime.now(),
     );
     _bookings.add(newBooking);
+    return newBooking;
   }
 
   List<BookingModel> getBookingsByCustomer(String customerId) {
@@ -39,45 +47,35 @@ class BookingService {
   void updateBookingStatus(String bookingId, String newStatus) {
     final index = _bookings.indexWhere((b) => b.id == bookingId);
     if (index != -1) {
-      final old = _bookings[index];
-      _bookings[index] = BookingModel(
-        id: old.id,
-        jasaId: old.jasaId,
-        jasaTitle: old.jasaTitle,
-        customerId: old.customerId,
-        customerName: old.customerName,
-        penyediaId: old.penyediaId,
-        penyediaName: old.penyediaName,
-        price: old.price,
+      _bookings[index] = _bookings[index].copyWith(
         status: newStatus,
-        notes: old.notes,
-        reviewText: old.reviewText,
-        reviewRating: old.reviewRating,
-        createdAt: old.createdAt,
-        completedAt: (newStatus == 'completed') ? DateTime.now() : old.completedAt,
+        completedAt: newStatus == 'completed' ? DateTime.now() : null,
       );
     }
+  }
+
+  /// Customer membatalkan pesanan. Hanya boleh saat status masih 'pending'
+  /// (menunggu). Mengembalikan true jika berhasil dibatalkan.
+  bool cancelBookingByCustomer(String bookingId) {
+    final index = _bookings.indexWhere((b) => b.id == bookingId);
+    if (index == -1) return false;
+    if (_bookings[index].status != 'pending') return false;
+    _bookings[index] = _bookings[index].copyWith(status: 'cancelled');
+    return true;
+  }
+
+  /// Apakah jasa ini masih punya pesanan yang berjalan (belum final)?
+  bool hasActiveBookingForJasa(String jasaId) {
+    const activeStatuses = ['pending', 'accepted', 'in_progress'];
+    return _bookings.any((b) => b.jasaId == jasaId && activeStatuses.contains(b.status));
   }
 
   void addReview(String bookingId, double rating, String reviewText) {
     final index = _bookings.indexWhere((b) => b.id == bookingId);
     if (index != -1) {
-      final old = _bookings[index];
-      _bookings[index] = BookingModel(
-        id: old.id,
-        jasaId: old.jasaId,
-        jasaTitle: old.jasaTitle,
-        customerId: old.customerId,
-        customerName: old.customerName,
-        penyediaId: old.penyediaId,
-        penyediaName: old.penyediaName,
-        price: old.price,
-        status: old.status,
-        notes: old.notes,
+      _bookings[index] = _bookings[index].copyWith(
         reviewText: reviewText,
         reviewRating: rating,
-        createdAt: old.createdAt,
-        completedAt: old.completedAt,
       );
     }
   }

@@ -39,6 +39,34 @@ class BookingModel {
     this.completedAt,
   });
 
+  BookingModel copyWith({
+    String? status,
+    String? reviewText,
+    double? reviewRating,
+    DateTime? completedAt,
+  }) {
+    return BookingModel(
+      id: id,
+      jasaId: jasaId,
+      jasaTitle: jasaTitle,
+      customerId: customerId,
+      customerName: customerName,
+      penyediaId: penyediaId,
+      penyediaName: penyediaName,
+      price: price,
+      basePrice: basePrice,
+      selectedOptions: selectedOptions,
+      optionsTotalPrice: optionsTotalPrice,
+      priceNote: priceNote,
+      status: status ?? this.status,
+      notes: notes,
+      reviewText: reviewText ?? this.reviewText,
+      reviewRating: reviewRating ?? this.reviewRating,
+      createdAt: createdAt,
+      completedAt: completedAt ?? this.completedAt,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

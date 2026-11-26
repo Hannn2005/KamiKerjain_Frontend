@@ -89,7 +89,7 @@ class _BookingScreenState extends State<BookingScreen> {
       );
 
       // Register to booking service
-      BookingService().createBooking(tempBooking);
+      final savedBooking = BookingService().createBooking(tempBooking);
 
       showDialog(
         context: context,
@@ -104,7 +104,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => PaymentScreen(booking: tempBooking)),
+                  MaterialPageRoute(builder: (_) => PaymentScreen(booking: savedBooking)),
                 );
               },
               child: const Text('Lanjut Pembayaran', style: TextStyle(color: AppColors.biruNavy, fontWeight: FontWeight.bold)),
