@@ -3,8 +3,29 @@ import '../utils/colors.dart';
 import '../utils/routes.dart';
 import '../services/auth_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _refreshUser();
+  }
+
+  /// Sinkronkan data profil dengan server (rating, foto, dll).
+  Future<void> _refreshUser() async {
+    try {
+      await AuthService().refreshCurrentUser();
+      if (mounted) setState(() {});
+    } catch (_) {
+      // Tetap tampilkan data yang sudah ada jika gagal.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,10 +62,15 @@ class ProfileScreen extends StatelessWidget {
                     child: CircleAvatar(
                       radius: 51,
                       backgroundColor: AppColors.putih,
-                      child: Text(
-                        user.username.isNotEmpty ? user.username[0].toUpperCase() : 'U',
-                        style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: AppColors.biruNavy),
-                      ),
+                      backgroundImage: (user.profileImage != null && user.profileImage!.isNotEmpty)
+                          ? NetworkImage(user.profileImage!)
+                          : null,
+                      child: (user.profileImage != null && user.profileImage!.isNotEmpty)
+                          ? null
+                          : Text(
+                              user.username.isNotEmpty ? user.username[0].toUpperCase() : 'U',
+                              style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: AppColors.biruNavy),
+                            ),
                     ),
                   ),
                   Positioned(
@@ -93,7 +119,7 @@ class ProfileScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                user.role == 'penyedia' ? 'Penyedia Jasa' : 'Customer',
+                user.role == 'penyedia' ? 'Penyedia Jasa' : (user.role == 'admin' ? 'Administrator' : 'Customer'),
                 style: const TextStyle(
                   color: AppColors.biruNavy,
                   fontWeight: FontWeight.bold,
@@ -107,7 +133,10 @@ class ProfileScreen extends StatelessWidget {
               context,
               icon: Icons.person_outline,
               title: 'Informasi Akun',
-              onTap: () => Navigator.pushNamed(context, AppRoutes.editProfile),
+              onTap: () async {
+                await Navigator.pushNamed(context, AppRoutes.editProfile);
+                if (mounted) setState(() {});
+              },
             ),
             if (user.role == 'penyedia')
               _buildProfileMenu(
@@ -196,8 +225,9 @@ class ProfileScreen extends StatelessWidget {
             child: const Text('Batal', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            onPressed: () {
-              AuthService().logout();
+            onPressed: () async {
+              await AuthService().logout();
+              if (!context.mounted) return;
               Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
             },
             style: ElevatedButton.styleFrom(
