@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
 import '../utils/helpers.dart';
 import '../models/jasa_model.dart';
 import '../services/jasa_service.dart';
+import '../services/api_client.dart';
+import '../widgets/jasa_image.dart';
 import 'jasa_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -16,43 +19,55 @@ class _SearchScreenState extends State<SearchScreen> {
   final List<String> categories = ['Semua', 'Tugas & Akademik', 'Desain & Multimedia', 'Teknologi & IT', 'Penulisan & Konten', 'Jasa Rumah Tangga', 'Les & Bimbingan', 'Lainnya'];
   String _selectedCategory = 'Semua';
   List<JasaModel> _searchResults = [];
+  bool _isLoading = true;
+  String? _error;
+  Timer? _debounce;
+  int _requestId = 0;
 
   @override
   void initState() {
     super.initState();
-    _searchResults = JasaService().getAllJasa();
+    _filterResults();
     _searchController.addListener(_onSearchChanged);
   }
-  
+
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
 
   void _onSearchChanged() {
-    _filterResults();
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), _filterResults);
   }
-  
-  void _filterResults() {
-    final query = _searchController.text.toLowerCase();
-    List<JasaModel> results = JasaService().getAllJasa();
-    
-    if (_selectedCategory != 'Semua') {
-      results = results.where((jasa) => jasa.category == _selectedCategory).toList();
-    }
-    
-    if (query.isNotEmpty) {
-      results = results.where((jasa) => 
-        jasa.title.toLowerCase().contains(query) || 
-        jasa.description.toLowerCase().contains(query)
-      ).toList();
-    }
-    
+
+  Future<void> _filterResults() async {
+    final requestId = ++_requestId;
     setState(() {
-      _searchResults = results;
+      _isLoading = true;
+      _error = null;
     });
+    try {
+      final results = await JasaService().getAllJasa(
+        query: _searchController.text,
+        category: _selectedCategory,
+      );
+      // Abaikan respons lama jika sudah ada pencarian yang lebih baru.
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _searchResults = results;
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _error = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -95,8 +110,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     onSelected: (val) {
                       setState(() {
                         _selectedCategory = cat;
-                        _filterResults();
                       });
+                      _filterResults();
                     },
                   ),
                 );
@@ -104,7 +119,11 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
           Expanded(
-            child: _searchResults.isEmpty 
+            child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+              ? Center(child: Text(_error!, textAlign: TextAlign.center))
+              : _searchResults.isEmpty 
               ? const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -132,14 +151,12 @@ class _SearchScreenState extends State<SearchScreen> {
                           padding: const EdgeInsets.all(12),
                           child: Row(
                             children: [
-                              Container(
+                              JasaImage(
+                                url: jasa.imageUrl,
                                 width: 80,
                                 height: 80,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.image, color: Colors.grey),
+                                iconSize: 30,
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
