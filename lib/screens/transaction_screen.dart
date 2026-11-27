@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/colors.dart';
 import '../utils/helpers.dart';
 import '../models/booking_model.dart';
-import '../services/auth_service.dart';
+import '../services/api_client.dart';
 import '../services/booking_service.dart';
 import 'booking_detail_screen.dart';
 
@@ -51,6 +51,8 @@ class _TransactionList extends StatefulWidget {
 class _TransactionListState extends State<_TransactionList> {
   final BookingService _bookingService = BookingService();
   List<BookingModel> _bookings = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -58,17 +60,32 @@ class _TransactionListState extends State<_TransactionList> {
     _load();
   }
 
-  void _load() {
-    final user = AuthService().currentUser;
-    var list = user == null ? <BookingModel>[] : _bookingService.getBookingsByCustomer(user.id);
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = _bookings.isEmpty;
+      _error = null;
+    });
+    try {
+      var list = await _bookingService.getMyBookings();
 
-    if (widget.type == 'aktif') {
-      list = list.where((b) => b.status == 'pending' || b.status == 'accepted' || b.status == 'in_progress').toList();
-    } else if (widget.type == 'selesai') {
-      list = list.where((b) => b.status == 'completed' || b.status == 'cancelled' || b.status == 'rejected').toList();
+      if (widget.type == 'aktif') {
+        list = list.where((b) => b.status == 'pending' || b.status == 'accepted' || b.status == 'in_progress').toList();
+      } else if (widget.type == 'selesai') {
+        list = list.where((b) => b.status == 'completed' || b.status == 'cancelled' || b.status == 'rejected').toList();
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _bookings = list;
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _isLoading = false;
+      });
     }
-
-    setState(() => _bookings = list);
   }
 
   void _confirmCancel(BookingModel b) {
@@ -83,18 +100,23 @@ class _TransactionListState extends State<_TransactionList> {
             child: const Text('Kembali', style: TextStyle(color: AppColors.abuText)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              final ok = _bookingService.cancelBookingByCustomer(b.id);
-              _load();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ok
-                      ? 'Pesanan berhasil dibatalkan'
-                      : 'Pesanan tidak dapat dibatalkan karena sudah diproses penyedia'),
-                  backgroundColor: ok ? AppColors.hijauSukses : AppColors.merahError,
-                ),
-              );
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await _bookingService.cancelBooking(b.id);
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Pesanan berhasil dibatalkan'),
+                    backgroundColor: AppColors.hijauSukses,
+                  ),
+                );
+              } on ApiException catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text(e.message), backgroundColor: AppColors.merahError),
+                );
+              }
+              if (mounted) _load();
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.merahError),
             child: const Text('Ya, Batalkan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -117,11 +139,38 @@ class _TransactionListState extends State<_TransactionList> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            TextButton(onPressed: _load, child: const Text('Coba lagi')),
+          ],
+        ),
+      );
+    }
     if (_bookings.isEmpty) {
-      return const Center(child: Text('Tidak ada transaksi', style: TextStyle(color: AppColors.abuText, fontSize: 16)));
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 120),
+            Center(child: Text('Tidak ada transaksi', style: TextStyle(color: AppColors.abuText, fontSize: 16))),
+          ],
+        ),
+      );
     }
 
-    return ListView.builder(
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: _bookings.length,
       itemBuilder: (context, index) {
@@ -180,6 +229,7 @@ class _TransactionListState extends State<_TransactionList> {
           ),
         );
       },
+    ),
     );
   }
 }
