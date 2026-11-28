@@ -1,98 +1,54 @@
 import '../models/chat_model.dart';
+import 'api_client.dart';
 
 class ChatService {
   static final ChatService _instance = ChatService._internal();
   factory ChatService() => _instance;
   ChatService._internal();
 
-  final String _uuid = DateTime.now().millisecondsSinceEpoch.toString();
+  final ApiClient _api = ApiClient();
 
-  final List<ChatRoom> _chatRooms = [
-    ChatRoom(
-      id: 'room_1',
-      customerId: 'usr_1',
-      customerName: 'Ahmad',
-      penyediaId: 'usr_2',
-      penyediaName: 'Budi Freelancer',
-      lastMessage: 'Halo kak, jasanya masih tersedia?',
-      lastMessageTime: DateTime.now().subtract(const Duration(minutes: 5)),
-      unreadCount: 1,
-    ),
-  ];
-
-  final Map<String, List<ChatMessage>> _messages = {
-    'room_1': [
-      ChatMessage(
-        id: 'msg_1',
-        senderId: 'usr_1',
-        receiverId: 'usr_2',
-        message: 'Halo kak, jasanya masih tersedia?',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-        isRead: false,
-      ),
-    ]
-  };
-
-  List<ChatRoom> getChatRooms(String userId) {
-    return _chatRooms.where((room) => 
-      room.customerId == userId || room.penyediaId == userId
-    ).toList()
-      ..sort((a, b) => (b.lastMessageTime ?? DateTime.now()).compareTo(a.lastMessageTime ?? DateTime.now()));
+  Future<List<ChatRoom>> getChatRooms() async {
+    final res = await _api.get('/chat/rooms');
+    final list = (res['data'] as List?) ?? const [];
+    return list
+        .map((e) => ChatRoom.fromMap(e as Map<String, dynamic>))
+        .toList();
   }
 
-  ChatRoom? getOrCreateChatRoom(String customerId, String customerName, String penyediaId, String penyediaName) {
-    try {
-      return _chatRooms.firstWhere((room) => 
-        room.customerId == customerId && room.penyediaId == penyediaId
-      );
-    } catch (e) {
-      final newRoom = ChatRoom(
-      id: _uuid,
-        customerId: customerId,
-        customerName: customerName,
-        penyediaId: penyediaId,
-        penyediaName: penyediaName,
-      );
-      _chatRooms.add(newRoom);
-      _messages[newRoom.id] = [];
-      return newRoom;
-    }
+  /// Ambil room yang sudah ada, atau buat baru. Dipanggil oleh CUSTOMER:
+  /// backend memakai user yang login sebagai customer, [penyediaId] sebagai lawan bicara.
+  Future<ChatRoom> getOrCreateChatRoom(String penyediaId) async {
+    final res = await _api.post('/chat/rooms', body: {'penyediaId': penyediaId});
+    return ChatRoom.fromMap(res['data'] as Map<String, dynamic>);
   }
 
-  List<ChatMessage> getMessages(String chatRoomId) {
-    return _messages[chatRoomId] ?? [];
+  /// Cari room existing antara penyedia ini dan seorang customer (null jika belum ada).
+  Future<ChatRoom?> findRoomWithCustomer(String customerId) async {
+    final rooms = await getChatRooms();
+    for (final room in rooms) {
+      if (room.customerId == customerId) return room;
+    }
+    return null;
   }
 
-  void sendMessage(String chatRoomId, ChatMessage message) {
-    if (!_messages.containsKey(chatRoomId)) {
-      _messages[chatRoomId] = [];
-    }
-    
-    final newMessage = ChatMessage(
-      id: _uuid,
-      senderId: message.senderId,
-      receiverId: message.receiverId,
-      message: message.message,
-      timestamp: DateTime.now(),
-      isRead: false,
-    );
-    
-    _messages[chatRoomId]!.add(newMessage);
-    
-    // Update chat room last message
-    final roomIndex = _chatRooms.indexWhere((room) => room.id == chatRoomId);
-    if (roomIndex != -1) {
-      final oldRoom = _chatRooms[roomIndex];
-      _chatRooms[roomIndex] = ChatRoom(
-        id: oldRoom.id,
-        customerId: oldRoom.customerId,
-        customerName: oldRoom.customerName,
-        penyediaId: oldRoom.penyediaId,
-        penyediaName: oldRoom.penyediaName,
-        lastMessage: message.message,
-        lastMessageTime: newMessage.timestamp,
-        unreadCount: oldRoom.unreadCount + 1, // Assuming not read instantly
-      );
-    }
+  Future<List<ChatMessage>> getMessages(String chatRoomId) async {
+    final res = await _api.get('/chat/rooms/$chatRoomId/messages');
+    final list = (res['data'] as List?) ?? const [];
+    return list
+        .map((e) => ChatMessage.fromMap(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<ChatMessage> sendMessage(
+    String chatRoomId, {
+    required String receiverId,
+    required String message,
+  }) async {
+    final res = await _api.post('/chat/rooms/$chatRoomId/messages', body: {
+      'receiverId': receiverId,
+      'message': message,
+    });
+    return ChatMessage.fromMap(res['data'] as Map<String, dynamic>);
   }
 }
