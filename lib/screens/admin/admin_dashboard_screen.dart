@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
-import '../../services/jasa_service.dart';
+import '../../services/api_client.dart';
 import '../../utils/colors.dart';
 import '../../utils/routes.dart';
 
@@ -19,6 +19,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   List<UserModel> _pendingProviders = [];
   List<UserModel> _approvedProviders = [];
   List<UserModel> _allUsers = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -27,12 +29,55 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     _loadData();
   }
 
-  void _loadData() {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
     setState(() {
-      _pendingProviders = _authService.getPendingProviders();
-      _approvedProviders = _authService.getApprovedProviders();
-      _allUsers = _authService.getAllUsers();
+      _isLoading = _allUsers.isEmpty;
+      _error = null;
     });
+    try {
+      final users = await _authService.getAllUsers();
+      if (!mounted) return;
+      setState(() {
+        _allUsers = users;
+        _pendingProviders =
+            users.where((u) => u.role == 'penyedia' && u.status == 'pending').toList();
+        _approvedProviders =
+            users.where((u) => u.role == 'penyedia' && u.status == 'approved').toList();
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(_error!, textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          TextButton(onPressed: _loadData, child: const Text('Coba lagi')),
+        ],
+      ),
+    );
+  }
+
+  void _showSnack(String message, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: color),
+    );
   }
 
   void _showApproveDialog(UserModel provider) {
@@ -50,16 +95,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             child: const Text('Batal', style: TextStyle(color: AppColors.abuText)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              _authService.approveProvider(provider.id);
+              try {
+                await _authService.approveProvider(provider.id);
+                _showSnack('Akun mitra "${provider.username}" BERHASIL DISETUJUI!', AppColors.hijauSukses);
+              } on ApiException catch (e) {
+                _showSnack(e.message, AppColors.merahError);
+              }
               _loadData();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Akun mitra "${provider.username}" BERHASIL DISETUJUI!'),
-                  backgroundColor: AppColors.hijauSukses,
-                ),
-              );
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.hijauSukses),
             child: const Text('Setujui (Approve)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -103,17 +147,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             child: const Text('Batal', style: TextStyle(color: AppColors.abuText)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (formKey.currentState!.validate()) {
                 Navigator.pop(ctx);
-                _authService.rejectProvider(provider.id, reasonController.text.trim());
+                try {
+                  await _authService.rejectProvider(provider.id, reasonController.text.trim());
+                  _showSnack('Pendaftaran mitra "${provider.username}" telah ditolak.', AppColors.merahError);
+                } on ApiException catch (e) {
+                  _showSnack(e.message, AppColors.merahError);
+                }
                 _loadData();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Pendaftaran mitra "${provider.username}" telah ditolak.'),
-                    backgroundColor: AppColors.merahError,
-                  ),
-                );
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.merahError),
@@ -142,6 +185,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             Text('Nama Berkas: ${provider.cvFileName ?? "CV_Dokumen.pdf"}', style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text('Kategori: ${provider.category ?? "Umum"}'),
+            if (provider.cvFileUrl != null && provider.cvFileUrl!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('Tautan Berkas:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              SelectableText(provider.cvFileUrl!, style: const TextStyle(fontSize: 12, color: AppColors.biruNavy)),
+            ],
             const SizedBox(height: 8),
             const Text('Portofolio & Riwayat Pengalaman:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 4),
@@ -205,21 +253,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             child: const Text('Batal', style: TextStyle(color: AppColors.abuText)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              final ok = _authService.deleteUser(user.id);
-              if (ok && isProvider) {
-                JasaService().deleteJasaByPenyedia(user.id);
+              try {
+                await _authService.deleteUser(user.id);
+                _showSnack('Pengguna "${user.username}" berhasil dihapus', AppColors.hijauSukses);
+              } on ApiException catch (e) {
+                _showSnack(
+                  e.statusCode == 500
+                      ? 'Pengguna ini tidak dapat dihapus karena masih memiliki data terkait (mis. riwayat pesanan).'
+                      : e.message,
+                  AppColors.merahError,
+                );
               }
               _loadData();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ok
-                      ? 'Pengguna "${user.username}" berhasil dihapus'
-                      : 'Pengguna ini tidak dapat dihapus'),
-                  backgroundColor: ok ? AppColors.hijauSukses : AppColors.merahError,
-                ),
-              );
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.merahError),
             child: const Text('Hapus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -229,8 +276,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     );
   }
 
-  void _handleLogout() {
-    _authService.logout();
+  Future<void> _handleLogout() async {
+    await _authService.logout();
+    if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
   }
 
@@ -278,7 +326,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ],
         ),
       ),
-      body: Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _buildError()
+              : Column(
         children: [
           // Stat summary banner
           Container(

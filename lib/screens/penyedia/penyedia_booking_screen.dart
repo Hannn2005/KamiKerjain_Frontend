@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:kami_kerjain/models/booking_model.dart';
 import 'package:kami_kerjain/services/auth_service.dart';
 import 'package:kami_kerjain/services/booking_service.dart';
+import 'package:kami_kerjain/services/chat_service.dart';
+import 'package:kami_kerjain/services/api_client.dart';
 import 'package:kami_kerjain/utils/colors.dart';
 import 'package:kami_kerjain/utils/helpers.dart';
 import 'package:kami_kerjain/screens/chat_detail_screen.dart';
@@ -18,6 +20,8 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
   final BookingService _bookingService = BookingService();
   final AuthService _authService = AuthService();
   List<BookingModel> myBookings = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -26,18 +30,69 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
     _loadBookings();
   }
 
-  void _loadBookings() {
-    final user = _authService.user;
-    if (user != null) {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadBookings() async {
+    setState(() {
+      _isLoading = myBookings.isEmpty;
+      _error = null;
+    });
+    try {
+      final list = await _bookingService.getMyBookings();
+      if (!mounted) return;
       setState(() {
-        myBookings = _bookingService.getBookingsByPenyedia(user.id);
+        myBookings = list;
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _isLoading = false;
       });
     }
   }
 
-  void _updateBookingStatus(String bookingId, String status) {
-    _bookingService.updateBookingStatus(bookingId, status);
-    _loadBookings();
+  Future<void> _updateBookingStatus(String bookingId, String status) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _bookingService.updateBookingStatus(bookingId, status);
+      messenger.showSnackBar(const SnackBar(content: Text('Status pesanan berhasil diperbarui')));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message), backgroundColor: Colors.red));
+    }
+    if (mounted) _loadBookings();
+  }
+
+  /// Buka chat dengan customer. Backend hanya membuat room dari sisi customer,
+  /// jadi penyedia hanya bisa membuka room yang sudah dimulai customer.
+  Future<void> _openChatWithCustomer(BookingModel b) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      final room = await ChatService().findRoomWithCustomer(b.customerId);
+      if (room == null) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Customer belum memulai percakapan. Chat bisa dimulai dari sisi customer.')),
+        );
+        return;
+      }
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(
+            chatRoomId: room.id,
+            otherUserName: b.customerName,
+            receiverId: b.customerId,
+          ),
+        ),
+      );
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message), backgroundColor: Colors.red));
+    }
   }
 
   void _showConfirmationDialog(String bookingId, String title, String content, String newStatus) {
@@ -55,7 +110,6 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
             onPressed: () {
               Navigator.pop(context);
               _updateBookingStatus(bookingId, newStatus);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Status pesanan berhasil diperbarui')));
             },
             child: const Text('Ya', style: TextStyle(color: AppColors.biruNavy)),
           ),
@@ -160,23 +214,48 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildBookingList(menunggu, isMenunggu: true),
-          _buildBookingList(aktif, isAktif: true),
-          _buildBookingList(selesai),
-        ],
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(_error!, textAlign: TextAlign.center),
+                      const SizedBox(height: 8),
+                      TextButton(onPressed: _loadBookings, child: const Text('Coba lagi')),
+                    ],
+                  ),
+                )
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildBookingList(menunggu, isMenunggu: true),
+                    _buildBookingList(aktif, isAktif: true),
+                    _buildBookingList(selesai),
+                  ],
+                ),
     );
   }
 
   Widget _buildBookingList(List<BookingModel> bookings, {bool isMenunggu = false, bool isAktif = false}) {
     if (bookings.isEmpty) {
-      return const Center(child: Text('Tidak ada data booking', style: TextStyle(color: AppColors.abuText)));
+      return RefreshIndicator(
+        onRefresh: _loadBookings,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 120),
+            Center(child: Text('Tidak ada data booking', style: TextStyle(color: AppColors.abuText))),
+          ],
+        ),
+      );
     }
     
-    return ListView.builder(
+    return RefreshIndicator(
+      onRefresh: _loadBookings,
+      child: ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: bookings.length,
       itemBuilder: (context, index) {
@@ -255,17 +334,7 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
                         children: [
                           // Tombol Chat Klien
                           OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatDetailScreen(
-                                    chatRoomId: 'chat_${b.id}',
-                                    otherUserName: b.customerName,
-                                  ),
-                                ),
-                              );
-                            },
+                            onPressed: () => _openChatWithCustomer(b),
                             icon: const Icon(Icons.chat_outlined, size: 16, color: AppColors.biruNavy),
                             label: const Text('Chat Klien', style: TextStyle(color: AppColors.biruNavy, fontSize: 12)),
                             style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
@@ -295,6 +364,7 @@ class _PenyediaBookingScreenState extends State<PenyediaBookingScreen> with Sing
           ),
         );
       },
+    ),
     );
   }
 

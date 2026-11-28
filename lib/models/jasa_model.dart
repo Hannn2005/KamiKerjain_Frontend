@@ -159,7 +159,7 @@ class JasaModel {
       rating: map['rating']?.toDouble() ?? 0.0,
       totalReviews: map['totalReviews']?.toInt() ?? 0,
       isActive: map['isActive'] ?? true,
-      createdAt: DateTime.parse(map['createdAt']),
+      createdAt: DateTime.parse(map['createdAt']).toLocal(),
     );
   }
 }

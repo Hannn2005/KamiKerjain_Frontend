@@ -14,6 +14,17 @@ class ChatMessage {
     required this.timestamp,
     this.isRead = false,
   });
+
+  factory ChatMessage.fromMap(Map<String, dynamic> map) {
+    return ChatMessage(
+      id: map['id'] ?? '',
+      senderId: map['senderId'] ?? '',
+      receiverId: map['receiverId'] ?? '',
+      message: map['message'] ?? '',
+      timestamp: DateTime.parse(map['timestamp']).toLocal(),
+      isRead: map['isRead'] ?? false,
+    );
+  }
 }
 
 class ChatRoom {
@@ -36,4 +47,19 @@ class ChatRoom {
     this.lastMessageTime,
     this.unreadCount = 0,
   });
+
+  factory ChatRoom.fromMap(Map<String, dynamic> map) {
+    return ChatRoom(
+      id: map['id'] ?? '',
+      customerId: map['customerId'] ?? '',
+      customerName: map['customerName'] ?? '',
+      penyediaId: map['penyediaId'] ?? '',
+      penyediaName: map['penyediaName'] ?? '',
+      lastMessage: map['lastMessage'],
+      lastMessageTime: map['lastMessageTime'] != null
+          ? DateTime.parse(map['lastMessageTime']).toLocal()
+          : null,
+      unreadCount: (map['unreadCount'] ?? 0).toInt(),
+    );
+  }
 }

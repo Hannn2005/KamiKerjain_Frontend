@@ -10,6 +10,7 @@ class UserModel {
   final String? description; // for penyedia jasa
   final String? category; // primary category for penyedia
   final String? cvFileName; // CV / Certification document file name
+  final String? cvFileUrl; // URL berkas CV di Cloudinary
   final String? portfolioText; // description of work proof & experience
   final String? rejectionReason; // if rejected by admin
   final double rating;
@@ -28,6 +29,7 @@ class UserModel {
     this.description,
     this.category,
     this.cvFileName,
+    this.cvFileUrl,
     this.portfolioText,
     this.rejectionReason,
     this.rating = 0.0,
@@ -47,6 +49,7 @@ class UserModel {
     String? description,
     String? category,
     String? cvFileName,
+    String? cvFileUrl,
     String? portfolioText,
     String? rejectionReason,
     double? rating,
@@ -65,6 +68,7 @@ class UserModel {
       description: description ?? this.description,
       category: category ?? this.category,
       cvFileName: cvFileName ?? this.cvFileName,
+      cvFileUrl: cvFileUrl ?? this.cvFileUrl,
       portfolioText: portfolioText ?? this.portfolioText,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       rating: rating ?? this.rating,
@@ -86,6 +90,7 @@ class UserModel {
       'description': description,
       'category': category,
       'cvFileName': cvFileName,
+      'cvFileUrl': cvFileUrl,
       'portfolioText': portfolioText,
       'rejectionReason': rejectionReason,
       'rating': rating,
@@ -107,11 +112,12 @@ class UserModel {
       description: map['description'],
       category: map['category'],
       cvFileName: map['cvFileName'],
+      cvFileUrl: map['cvFileUrl'],
       portfolioText: map['portfolioText'],
       rejectionReason: map['rejectionReason'],
       rating: map['rating']?.toDouble() ?? 0.0,
       totalReviews: map['totalReviews']?.toInt() ?? 0,
-      createdAt: DateTime.parse(map['createdAt']),
+      createdAt: DateTime.parse(map['createdAt']).toLocal(),
     );
   }
 }

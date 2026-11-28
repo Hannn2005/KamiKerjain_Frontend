@@ -3,6 +3,7 @@ import 'package:kami_kerjain/models/jasa_model.dart';
 import 'package:kami_kerjain/services/auth_service.dart';
 import 'package:kami_kerjain/services/jasa_service.dart';
 import 'package:kami_kerjain/services/booking_service.dart';
+import 'package:kami_kerjain/services/api_client.dart';
 import 'package:kami_kerjain/utils/colors.dart';
 import 'package:kami_kerjain/utils/helpers.dart';
 import 'package:kami_kerjain/screens/penyedia/tambah_jasa_screen.dart';
@@ -18,6 +19,8 @@ class _KelolaJasaScreenState extends State<KelolaJasaScreen> {
   final JasaService _jasaService = JasaService();
   final AuthService _authService = AuthService();
   List<JasaModel> myJasa = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -25,18 +28,56 @@ class _KelolaJasaScreenState extends State<KelolaJasaScreen> {
     _loadJasa();
   }
 
-  void _loadJasa() {
+  Future<void> _loadJasa() async {
     final user = _authService.user;
-    if (user != null) {
+    if (user == null) return;
+    setState(() {
+      _isLoading = myJasa.isEmpty;
+      _error = null;
+    });
+    try {
+      final list = await _jasaService.getJasaByPenyedia(user.id);
+      if (!mounted) return;
       setState(() {
-        myJasa = _jasaService.getJasaByPenyedia(user.id);
+        myJasa = list;
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _isLoading = false;
       });
     }
   }
 
-  void _confirmDelete(JasaModel jasa) {
+  Future<void> _toggleActive(JasaModel jasa, bool value) async {
+    try {
+      await _jasaService.setActive(jasa.id, value);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: AppColors.merahError),
+      );
+    }
+    if (mounted) _loadJasa();
+  }
+
+  Future<void> _confirmDelete(JasaModel jasa) async {
     // Jasa yang masih punya pesanan berjalan tidak boleh dihapus
-    if (BookingService().hasActiveBookingForJasa(jasa.id)) {
+    bool hasActive = false;
+    try {
+      hasActive = await BookingService().hasActiveBookingForJasa(jasa.id);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: AppColors.merahError),
+      );
+      return;
+    }
+    if (!mounted) return;
+
+    if (hasActive) {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -68,13 +109,26 @@ class _KelolaJasaScreenState extends State<KelolaJasaScreen> {
             child: const Text('Batal', style: TextStyle(color: AppColors.abuText)),
           ),
           TextButton(
-            onPressed: () {
-              _jasaService.deleteJasa(jasa.id);
+            onPressed: () async {
               Navigator.pop(context);
-              _loadJasa();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Jasa berhasil dihapus')),
-              );
+              final messenger = ScaffoldMessenger.of(this.context);
+              try {
+                await _jasaService.deleteJasa(jasa.id);
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Jasa berhasil dihapus')),
+                );
+              } on ApiException catch (e) {
+                // Jasa yang sudah punya riwayat pesanan ditolak database (FK RESTRICT).
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(e.statusCode == 500
+                        ? 'Jasa tidak dapat dihapus karena sudah memiliki riwayat pesanan. Nonaktifkan saja jasa ini.'
+                        : e.message),
+                    backgroundColor: AppColors.merahError,
+                  ),
+                );
+              }
+              if (mounted) _loadJasa();
             },
             child: const Text('Hapus', style: TextStyle(color: AppColors.merahError)),
           ),
@@ -91,7 +145,20 @@ class _KelolaJasaScreenState extends State<KelolaJasaScreen> {
         title: const Text('Kelola Jasa Saya', style: TextStyle(color: AppColors.putih)),
         backgroundColor: AppColors.biruNavy,
       ),
-      body: myJasa.isEmpty
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(_error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 8),
+                  TextButton(onPressed: _loadJasa, child: const Text('Coba lagi')),
+                ],
+              ),
+            )
+          : myJasa.isEmpty
           ? const Center(
               child: Text('Belum ada jasa terdaftar', style: TextStyle(color: AppColors.abuText, fontSize: 16)),
             )
@@ -141,10 +208,7 @@ class _KelolaJasaScreenState extends State<KelolaJasaScreen> {
                               Switch(
                                 value: jasa.isActive,
                                 activeColor: AppColors.kuningLogo,
-                                onChanged: (value) {
-                                  _jasaService.updateJasa(jasa.copyWith(isActive: value));
-                                  _loadJasa();
-                                },
+                                onChanged: (value) => _toggleActive(jasa, value),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.delete_outline, color: AppColors.merahError),

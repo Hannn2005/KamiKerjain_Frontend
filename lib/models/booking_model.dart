@@ -114,8 +114,8 @@ class BookingModel {
       notes: map['notes'],
       reviewText: map['reviewText'],
       reviewRating: map['reviewRating']?.toDouble(),
-      createdAt: DateTime.parse(map['createdAt']),
-      completedAt: map['completedAt'] != null ? DateTime.parse(map['completedAt']) : null,
+      createdAt: DateTime.parse(map['createdAt']).toLocal(),
+      completedAt: map['completedAt'] != null ? DateTime.parse(map['completedAt']).toLocal() : null,
     );
   }
 }

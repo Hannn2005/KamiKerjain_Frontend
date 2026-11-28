@@ -1,4 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:kami_kerjain/services/api_client.dart';
 import 'package:kami_kerjain/models/jasa_model.dart';
 import 'package:kami_kerjain/services/auth_service.dart';
 import 'package:kami_kerjain/services/jasa_service.dart';
@@ -25,6 +28,9 @@ class _TambahJasaScreenState extends State<TambahJasaScreen> {
   String? _selectedCategory;
   String _selectedPriceType = 'starting_from'; // 'starting_from', 'hourly', 'fixed', 'survey'
   List<JasaOption> _options = [];
+  bool _isSaving = false;
+  Uint8List? _newImageBytes;
+  String? _newImageName;
   
   final List<String> _categories = [
     'Tugas & Akademik',
@@ -149,43 +155,70 @@ class _TambahJasaScreenState extends State<TambahJasaScreen> {
     );
   }
 
-  void _saveJasa() {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedCategory == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pilih kategori jasa')));
-        return;
-      }
-      
-      final user = AuthService().user;
-      if (user == null) return;
-      
-      final newJasa = JasaModel(
-        id: widget.jasaToEdit?.id ?? '', // Empty string for new, JasaService will generate uuid
-        penyediaId: user.id,
-        penyediaName: user.username,
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        category: _selectedCategory!,
-        price: double.parse(_priceController.text),
-        priceType: _selectedPriceType,
-        priceUnit: _priceUnitController.text.trim().isNotEmpty ? _priceUnitController.text.trim() : '/ proyek',
-        options: _options,
-        location: _locationController.text.trim(),
-        isActive: widget.jasaToEdit?.isActive ?? true,
-        createdAt: widget.jasaToEdit?.createdAt ?? DateTime.now(),
-      );
+  Future<void> _pickImage() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _newImageBytes = bytes;
+      _newImageName = picked.name;
+    });
+  }
 
-      if (widget.jasaToEdit != null) {
-        JasaService().updateJasa(newJasa);
-      } else {
-        JasaService().addJasa(newJasa);
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.jasaToEdit != null ? 'Jasa berhasil diperbarui' : 'Jasa berhasil ditambahkan')),
-      );
-      Navigator.pop(context);
+  Future<void> _saveJasa() async {
+    if (_isSaving || !_formKey.currentState!.validate()) return;
+    if (_selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pilih kategori jasa')));
+      return;
     }
+
+    final user = AuthService().user;
+    if (user == null) return;
+
+    final editing = widget.jasaToEdit != null;
+    final jasa = JasaModel(
+      id: widget.jasaToEdit?.id ?? '', // Kosong untuk jasa baru; ID dibuat oleh server
+      penyediaId: user.id,
+      penyediaName: user.username,
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      category: _selectedCategory!,
+      price: double.parse(_priceController.text),
+      priceType: _selectedPriceType,
+      priceUnit: _priceUnitController.text.trim().isNotEmpty ? _priceUnitController.text.trim() : '/ proyek',
+      options: _options,
+      location: _locationController.text.trim(),
+      imageUrl: widget.jasaToEdit?.imageUrl,
+      isActive: widget.jasaToEdit?.isActive ?? true,
+      createdAt: widget.jasaToEdit?.createdAt ?? DateTime.now(),
+    );
+
+    setState(() => _isSaving = true);
+    try {
+      if (editing) {
+        await JasaService().updateJasa(jasa, imageBytes: _newImageBytes, imageName: _newImageName);
+      } else {
+        await JasaService().addJasa(jasa, imageBytes: _newImageBytes, imageName: _newImageName);
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(editing ? 'Jasa berhasil diperbarui' : 'Jasa berhasil ditambahkan')),
+    );
+    Navigator.pop(context);
   }
 
   @override
@@ -205,24 +238,40 @@ class _TambahJasaScreenState extends State<TambahJasaScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Simulasi upload gambar')));
-                },
+                onTap: _pickImage,
                 child: Container(
                   height: 140,
+                  clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
                     color: AppColors.biruMuda,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.biruNavy.withOpacity(0.3)),
+                    image: _newImageBytes != null
+                        ? DecorationImage(image: MemoryImage(_newImageBytes!), fit: BoxFit.cover)
+                        : ((widget.jasaToEdit?.imageUrl ?? '').isNotEmpty
+                            ? DecorationImage(image: NetworkImage(widget.jasaToEdit!.imageUrl!), fit: BoxFit.cover)
+                            : null),
                   ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_a_photo, size: 40, color: AppColors.biruNavy),
-                      SizedBox(height: 8),
-                      Text('Upload Foto Layanan', style: TextStyle(color: AppColors.biruNavy, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
+                  child: (_newImageBytes != null || (widget.jasaToEdit?.imageUrl ?? '').isNotEmpty)
+                      ? const Align(
+                          alignment: Alignment.bottomRight,
+                          child: Padding(
+                            padding: EdgeInsets.all(8),
+                            child: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: AppColors.kuningLogo,
+                              child: Icon(Icons.edit, size: 16, color: AppColors.biruNavy),
+                            ),
+                          ),
+                        )
+                      : const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_a_photo, size: 40, color: AppColors.biruNavy),
+                            SizedBox(height: 8),
+                            Text('Upload Foto Layanan', style: TextStyle(color: AppColors.biruNavy, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -413,12 +462,18 @@ class _TambahJasaScreenState extends State<TambahJasaScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: _saveJasa,
+                onPressed: _isSaving ? null : _saveJasa,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.kuningLogo,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text('Simpan Jasa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.biruNavy)),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.biruNavy),
+                      )
+                    : const Text('Simpan Jasa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.biruNavy)),
               ),
             ],
           ),

@@ -4,6 +4,8 @@ import 'package:kami_kerjain/models/booking_model.dart';
 import 'package:kami_kerjain/services/auth_service.dart';
 import 'package:kami_kerjain/services/jasa_service.dart';
 import 'package:kami_kerjain/services/booking_service.dart';
+import 'package:kami_kerjain/services/api_client.dart';
+import 'package:kami_kerjain/utils/routes.dart';
 import 'package:kami_kerjain/utils/colors.dart';
 import 'package:kami_kerjain/utils/helpers.dart';
 import 'package:kami_kerjain/screens/penyedia/tambah_jasa_screen.dart';
@@ -34,21 +36,34 @@ class _PenyediaHomeScreenState extends State<PenyediaHomeScreen> {
 
   Future<void> _loadData() async {
     final user = _authService.user;
-    if (user != null) {
-      final allJasa = _jasaService.getJasaByPenyedia(user.id);
-      final allBookings = _bookingService.getBookingsByPenyedia(user.id);
+    if (user == null) return;
 
+    try {
+      final results = await Future.wait([
+        _jasaService.getJasaByPenyedia(user.id),
+        _bookingService.getMyBookings(),
+      ]);
+      final allJasa = results[0] as List<JasaModel>;
+      final allBookings = results[1] as List<BookingModel>;
+
+      if (!mounted) return;
       setState(() {
         myJasa = allJasa;
         totalJasa = allJasa.length;
         recentBookings = allBookings.take(5).toList();
         bookingMasuk = allBookings.where((b) => b.status == 'pending').length;
-        
-        if (allJasa.isNotEmpty) {
-          double sumRating = allJasa.fold(0, (sum, item) => sum + item.rating);
-          averageRating = sumRating / allJasa.length;
-        }
+
+        // Rating rata-rata hanya dari jasa yang sudah punya ulasan.
+        final rated = allJasa.where((j) => j.totalReviews > 0).toList();
+        averageRating = rated.isEmpty
+            ? 0.0
+            : rated.fold<double>(0, (sum, item) => sum + item.rating) / rated.length;
       });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -66,7 +81,7 @@ class _PenyediaHomeScreenState extends State<PenyediaHomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications, color: AppColors.putih),
-            onPressed: () {},
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.notification),
           ),
         ],
       ),
