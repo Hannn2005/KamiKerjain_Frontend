@@ -1,126 +1,52 @@
+import 'dart:typed_data';
+
 import '../models/user_model.dart';
+import 'api_client.dart';
+
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
 
+  final ApiClient _api = ApiClient();
+
   UserModel? currentUser;
-  
-  final List<UserModel> _users = [
-    // 1. Akun Tetap Admin
-    UserModel(
-      id: 'usr_admin',
-      username: 'Administrator KamiKerjain',
-      email: 'admin@kamikerjain.com',
-      phone: '081100000001',
-      role: 'admin',
-      status: 'approved',
-      createdAt: DateTime.now().subtract(const Duration(days: 365)),
-    ),
-    // 2. Akun Customer
-    UserModel(
-      id: 'usr_1',
-      username: 'Ahmad Customer',
-      email: 'customer@test.com',
-      phone: '081234567890',
-      role: 'customer',
-      status: 'approved',
-      createdAt: DateTime.now().subtract(const Duration(days: 30)),
-    ),
-    // 3. Akun Penyedia Aktif 1
-    UserModel(
-      id: 'usr_2',
-      username: 'Budi Freelancer',
-      email: 'penyedia@test.com',
-      phone: '081298765432',
-      role: 'penyedia',
-      status: 'approved',
-      category: 'Teknologi & IT',
-      cvFileName: 'CV_Budi_WebDeveloper.pdf',
-      portfolioText: 'Fullstack Web Developer, berpengalaman 3 tahun mengerjakan website WordPress, React, dan Flutter.',
-      description: 'Penyedia jasa website & IT serba bisa',
-      createdAt: DateTime.now().subtract(const Duration(days: 60)),
-    ),
-    // 4. Akun Penyedia Aktif 2
-    UserModel(
-      id: 'usr_3',
-      username: 'Siti Designer',
-      email: 'penyedia2@test.com',
-      phone: '081345678901',
-      role: 'penyedia',
-      status: 'approved',
-      category: 'Desain & Multimedia',
-      cvFileName: 'Portofolio_Siti_Desain.pdf',
-      portfolioText: 'Desainer grafis profesional, mahir Figma, Adobe Illustrator, dan After Effects.',
-      description: 'Desainer grafis & video profesional',
-      createdAt: DateTime.now().subtract(const Duration(days: 120)),
-    ),
-    // 5. Akun Calon Penyedia (Menunggu Persetujuan Admin untuk demo)
-    UserModel(
-      id: 'usr_4',
-      username: 'Hendra Servis & Cleaning',
-      email: 'calon_mitra@test.com',
-      phone: '085711223344',
-      role: 'penyedia',
-      status: 'pending',
-      category: 'Jasa Rumah Tangga',
-      cvFileName: 'Sertifikat_Keahlian_Hendra.pdf',
-      portfolioText: 'Memiliki sertifikasi BNSP Teknisi Pembersihan & AC. Pengalaman 4 tahun menangani cleaning rumah tinggal dan apartemen.',
-      description: 'Spesialis pembersihan rumah & servis peralatan rumah tangga',
-      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-    ),
-  ];
-  
-  // Password map untuk mock service
-  final Map<String, String> _userPasswords = {
-    'admin@kamikerjain.com': 'admin123',
-    'customer@test.com': '123456',
-    'penyedia@test.com': '123456',
-    'penyedia2@test.com': '123456',
-    'calon_mitra@test.com': '123456',
-  };
 
-  Future<bool> login(String email, String password) async {
-    // Simulasi delay jaringan
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    if (_userPasswords[email] == password) {
-      try {
-        currentUser = _users.firstWhere((user) => user.email == email);
-        return true;
-      } catch (e) {
-        return false;
-      }
-    }
-    return false;
+  bool get isLoggedIn => currentUser != null;
+  UserModel? get user => currentUser;
+
+  // ------------------------------------------------------------- sesi/akun
+
+  /// Login. Melempar [ApiException] jika gagal (mis. email/password salah).
+  Future<UserModel> login(String email, String password) async {
+    final res = await _api.post('/auth/login', body: {
+      'email': email.trim(),
+      'password': password,
+    });
+    final user = UserModel.fromMap(res['data'] as Map<String, dynamic>);
+    currentUser = user;
+    return user;
   }
 
-  // Register Customer biasa (langsung approved)
-  Future<bool> register(String username, String email, String password, String phone, String role) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    if (_users.any((u) => u.email == email)) {
-      return false; 
-    }
-
-    final newUser = UserModel(
-      id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
-      username: username,
-      email: email,
-      phone: phone,
-      role: role,
-      status: role == 'penyedia' ? 'pending' : 'approved',
-      createdAt: DateTime.now(),
-    );
-
-    _users.add(newUser);
-    _userPasswords[email] = password;
-    return true;
+  /// Daftar sebagai customer.
+  Future<void> register({
+    required String username,
+    required String email,
+    required String password,
+    required String phone,
+  }) async {
+    await _api.post('/auth/register', body: {
+      'username': username,
+      'email': email,
+      'password': password,
+      'phone': phone,
+      'role': 'customer',
+    });
   }
 
-  // Register Penyedia Jasa khusus (dengan CV, kategori, & portofolio, status 'pending')
-  Future<bool> registerPenyedia({
+  /// Daftar sebagai penyedia jasa (status awal `pending` sampai disetujui admin).
+  Future<void> registerPenyedia({
     required String username,
     required String email,
     required String password,
@@ -128,82 +54,115 @@ class AuthService {
     required String category,
     required String portfolioText,
     required String cvFileName,
+    Uint8List? cvBytes,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    if (_users.any((u) => u.email == email)) {
-      return false;
-    }
-
-    final newPenyedia = UserModel(
-      id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
-      username: username,
-      email: email,
-      phone: phone,
-      role: 'penyedia',
-      status: 'pending', // Menunggu persetujuan admin
-      category: category,
-      portfolioText: portfolioText,
-      cvFileName: cvFileName,
-      description: portfolioText,
-      createdAt: DateTime.now(),
+    await _api.multipart(
+      'POST',
+      '/auth/register',
+      fields: {
+        'username': username,
+        'email': email,
+        'password': password,
+        'phone': phone,
+        'role': 'penyedia',
+        'category': category,
+        'portfolioText': portfolioText,
+        'cvFileName': cvFileName,
+      },
+      files: cvBytes == null
+          ? const []
+          : [UploadFile(field: 'cvFile', bytes: cvBytes, filename: cvFileName)],
     );
-
-    _users.add(newPenyedia);
-    _userPasswords[email] = password;
-    return true;
   }
 
-  // Admin Actions:
-  List<UserModel> getPendingProviders() {
-    return _users.where((u) => u.role == 'penyedia' && u.status == 'pending').toList();
+  /// Ambil ulang data user dari server. Mengembalikan null jika belum login.
+  Future<UserModel?> refreshCurrentUser() async {
+    try {
+      final res = await _api.get('/auth/me');
+      currentUser = UserModel.fromMap(res['data'] as Map<String, dynamic>);
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) currentUser = null;
+      rethrow;
+    }
+    return currentUser;
   }
 
-  List<UserModel> getApprovedProviders() {
-    return _users.where((u) => u.role == 'penyedia' && u.status == 'approved').toList();
-  }
-
-  List<UserModel> getAllUsers() {
-    return List.from(_users);
-  }
-
-  void approveProvider(String userId) {
-    final idx = _users.indexWhere((u) => u.id == userId);
-    if (idx != -1) {
-      _users[idx] = _users[idx].copyWith(status: 'approved');
-      if (currentUser?.id == userId) {
-        currentUser = _users[idx];
-      }
+  /// Logout. State lokal selalu dibersihkan walaupun request gagal.
+  Future<void> logout() async {
+    try {
+      await _api.post('/auth/logout');
+    } catch (_) {
+      // Abaikan: sesi lokal tetap dibuang.
+    } finally {
+      currentUser = null;
+      _api.clearSession();
     }
   }
 
-  void rejectProvider(String userId, String reason) {
-    final idx = _users.indexWhere((u) => u.id == userId);
-    if (idx != -1) {
-      _users[idx] = _users[idx].copyWith(status: 'rejected', rejectionReason: reason);
-      if (currentUser?.id == userId) {
-        currentUser = _users[idx];
-      }
-    }
+  Future<UserModel> updateProfile({
+    String? username,
+    String? phone,
+    String? address,
+    String? description,
+    Uint8List? imageBytes,
+    String? imageName,
+  }) async {
+    final fields = <String, String>{};
+    if (username != null) fields['username'] = username;
+    if (phone != null) fields['phone'] = phone;
+    if (address != null) fields['address'] = address;
+    if (description != null) fields['description'] = description;
+
+    final res = await _api.multipart(
+      'PATCH',
+      '/auth/profile',
+      fields: fields,
+      files: imageBytes == null
+          ? const []
+          : [
+              UploadFile(
+                field: 'profileImage',
+                bytes: imageBytes,
+                filename: imageName ?? 'profile.jpg',
+              )
+            ],
+    );
+    final updated = UserModel.fromMap(res['data'] as Map<String, dynamic>);
+    currentUser = updated;
+    return updated;
   }
 
-  /// Admin menghapus pengguna. Akun admin dan akun yang sedang login
-  /// tidak boleh dihapus. Mengembalikan true jika berhasil.
-  bool deleteUser(String userId) {
-    final idx = _users.indexWhere((u) => u.id == userId);
-    if (idx == -1) return false;
-    final target = _users[idx];
-    if (target.role == 'admin' || target.id == currentUser?.id) return false;
-    _users.removeAt(idx);
-    _userPasswords.remove(target.email);
-    return true;
+  // ----------------------------------------------------------------- admin
+
+  Future<List<UserModel>> getAllUsers() async {
+    final res = await _api.get('/auth/users');
+    return _parseUsers(res['data']);
   }
 
-  void logout() {
-    currentUser = null;
+  Future<List<UserModel>> getProviders({String? status}) async {
+    final res = await _api.get('/auth/providers', query: {'status': status});
+    return _parseUsers(res['data']);
   }
 
-  bool get isLoggedIn => currentUser != null;
-  
-  UserModel? get user => currentUser;
+  Future<UserModel> approveProvider(String userId) async {
+    final res = await _api.patch('/auth/providers/$userId/approve');
+    return UserModel.fromMap(res['data'] as Map<String, dynamic>);
+  }
+
+  Future<UserModel> rejectProvider(String userId, String reason) async {
+    final res = await _api
+        .patch('/auth/providers/$userId/reject', body: {'reason': reason});
+    return UserModel.fromMap(res['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteUser(String userId) async {
+    await _api.delete('/auth/users/$userId');
+  }
+
+  List<UserModel> _parseUsers(dynamic data) {
+    final list = (data as List?) ?? const [];
+    return list
+        .map((e) => UserModel.fromMap(e as Map<String, dynamic>))
+        .toList();
+  }
 }
