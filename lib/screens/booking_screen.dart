@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/jasa_model.dart';
 import '../models/booking_model.dart';
-import '../services/auth_service.dart';
 import '../services/booking_service.dart';
+import '../services/api_client.dart';
 import '../utils/colors.dart';
 import '../utils/helpers.dart';
 import 'payment_screen.dart';
@@ -23,6 +23,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   // Selected add-on options
   final Set<String> _selectedOptionIds = {};
+  bool _isSubmitting = false;
 
   double get _addonsTotal {
     double sum = 0.0;
@@ -36,15 +37,8 @@ class _BookingScreenState extends State<BookingScreen> {
 
   double get _totalPrice => widget.jasa.price + _addonsTotal;
 
-  List<String> get _selectedOptionTitles {
-    List<String> titles = [];
-    for (var opt in widget.jasa.options) {
-      if (_selectedOptionIds.contains(opt.id)) {
-        titles.add('${opt.title} (+${formatRupiah(opt.price)})');
-      }
-    }
-    return titles;
-  }
+  List<JasaOption> get _selectedOptions =>
+      widget.jasa.options.where((o) => _selectedOptionIds.contains(o.id)).toList();
 
   @override
   void dispose() {
@@ -66,55 +60,60 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  void _confirmBooking() {
-    if (_formKey.currentState!.validate() && _selectedDate != null) {
-      final user = AuthService().currentUser;
-      
-      BookingModel tempBooking = BookingModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        jasaId: widget.jasa.id,
-        jasaTitle: widget.jasa.title,
-        customerId: user?.id ?? '',
-        customerName: user?.username ?? 'Pengguna',
-        penyediaId: widget.jasa.penyediaId,
-        penyediaName: widget.jasa.penyediaName,
-        price: _totalPrice,
-        basePrice: widget.jasa.price,
-        selectedOptions: _selectedOptionTitles,
-        optionsTotalPrice: _addonsTotal,
-        priceNote: widget.jasa.formattedPriceType,
-        status: 'pending',
-        notes: _notesController.text.trim(),
-        createdAt: _selectedDate ?? DateTime.now(),
-      );
-
-      // Register to booking service
-      final savedBooking = BookingService().createBooking(tempBooking);
-
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Booking Dikonfirmasi', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.biruNavy)),
-          content: Text(
-            'Total estimasi pesanan Anda adalah ${formatRupiah(_totalPrice)}.\nSilakan lanjutkan ke proses pembayaran.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => PaymentScreen(booking: savedBooking)),
-                );
-              },
-              child: const Text('Lanjut Pembayaran', style: TextStyle(color: AppColors.biruNavy, fontWeight: FontWeight.bold)),
-            )
-          ],
-        ),
-      );
-    } else if (_selectedDate == null) {
+  Future<void> _confirmBooking() async {
+    if (_isSubmitting) return;
+    if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pilih tanggal pengerjaan terlebih dahulu!')));
+      return;
     }
+    if (!_formKey.currentState!.validate()) return;
+
+    // Backend belum punya kolom tanggal pengerjaan, jadi tanggal disimpan di catatan.
+    final userNotes = _notesController.text.trim();
+    final notes = 'Tanggal pengerjaan: ${formatTanggal(_selectedDate!)}'
+        '${userNotes.isNotEmpty ? '\n$userNotes' : ''}';
+
+    setState(() => _isSubmitting = true);
+    final BookingModel savedBooking;
+    try {
+      savedBooking = await BookingService().createBooking(
+        jasaId: widget.jasa.id,
+        selectedOptions: _selectedOptions,
+        notes: notes,
+        priceNote: widget.jasa.formattedPriceType,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Booking Dikonfirmasi', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.biruNavy)),
+        content: Text(
+          'Total estimasi pesanan Anda adalah ${formatRupiah(savedBooking.price)}.\nSilakan lanjutkan ke proses pembayaran.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => PaymentScreen(booking: savedBooking)),
+              );
+            },
+            child: const Text('Lanjut Pembayaran', style: TextStyle(color: AppColors.biruNavy, fontWeight: FontWeight.bold)),
+          )
+        ],
+      ),
+    );
   }
 
   @override
@@ -313,13 +312,19 @@ class _BookingScreenState extends State<BookingScreen> {
             const SizedBox(height: 24),
 
             ElevatedButton(
-              onPressed: _confirmBooking,
+              onPressed: _isSubmitting ? null : _confirmBooking,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.biruNavy,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('Konfirmasi & Lanjut Pembayaran', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Konfirmasi & Lanjut Pembayaran', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ],
         ),

@@ -4,6 +4,7 @@ import '../utils/routes.dart';
 import '../widgets/custom_textfield.dart';
 import '../widgets/auth_footer.dart';
 import '../services/auth_service.dart';
+import '../services/api_client.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -31,23 +32,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    final success = await AuthService().login(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
-
-    setState(() => _isLoading = false);
+    String? errorMessage;
+    try {
+      await AuthService().login(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+    } catch (_) {
+      errorMessage = 'Terjadi kesalahan. Coba lagi.';
+    }
 
     if (!mounted) return;
+    setState(() => _isLoading = false);
 
-    if (success) {
+    if (errorMessage == null) {
       final user = AuthService().currentUser;
       if (user?.role == 'admin') {
         // Direct route to Admin Dashboard
         Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
       } else if (user?.role == 'penyedia') {
         if (user?.status == 'pending') {
-          AuthService().logout();
+          await AuthService().logout();
+          if (!mounted) return;
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -72,7 +80,8 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         } else if (user?.status == 'rejected') {
           final reason = user?.rejectionReason ?? 'Dokumen CV/Portofolio belum memenuhi standar kualifikasi';
-          AuthService().logout();
+          await AuthService().logout();
+          if (!mounted) return;
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -102,8 +111,8 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email atau password salah'),
+        SnackBar(
+          content: Text(errorMessage),
           backgroundColor: Colors.red,
         ),
       );
@@ -211,19 +220,21 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           );
                         },
+
+                        // remove this feature for later
                         child: const Text(
-                          'Lupa password?',
+                          'Lupa password redirect ke gmail nanti ini',
                           style: TextStyle(color: AppColors.biruNavy),
                         ),
                       ),
                       const SizedBox(height: 14),
-
-                      // Hint akun testing termasuk ADMIN & PENYEDIA PENDING
+                      
+                      // testing acc untuk login sementara nanti
                       Container(
                         margin: const EdgeInsets.symmetric(horizontal: 24),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.biruNavy.withOpacity(0.05),
+                          color: AppColors.biruNavy.withAlpha(5),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.biruNavy.withOpacity(0.12)),
                         ),
@@ -232,10 +243,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: const [
                             Row(
                               children: [
-                                Icon(Icons.info_outline, size: 16, color: AppColors.biruNavy),
                                 SizedBox(width: 6),
                                 Text(
-                                  'Akun Uji Coba Demo:',
+                                  'Test akun :',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
@@ -245,10 +255,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               ],
                             ),
                             SizedBox(height: 6),
-                            Text('• Admin (Acc Mitra): admin@kamikerjain.com / admin123', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.purple)),
-                            Text('• Calon Mitra (Pending): calon_mitra@test.com / 123456', style: TextStyle(fontSize: 11, color: Colors.deepOrange)),
-                            Text('• Penyedia Aktif: penyedia@test.com / 123456', style: TextStyle(fontSize: 11, color: AppColors.biruNavy)),
-                            Text('• Customer: customer@test.com / 123456', style: TextStyle(fontSize: 11, color: Colors.black87)),
+                            Text('• Admin: admintest@gmail.com / 123456', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.purple)),
+                            Text('• buditest@gmail.com / 123456', style: TextStyle(fontSize: 11, color: Colors.deepOrange)),
+                            Text('• anditest@gmail.com / 123456', style: TextStyle(fontSize: 11, color: AppColors.biruNavy)),
+                            Text('• cacatest@gmail.com / 123456', style: TextStyle(fontSize: 11, color: Colors.black87)),
                           ],
                         ),
                       ),

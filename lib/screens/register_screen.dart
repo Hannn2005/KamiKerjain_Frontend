@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+
 import '../utils/colors.dart';
 import '../widgets/custom_textfield.dart';
 import '../widgets/auth_footer.dart';
+
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+
 import '../services/auth_service.dart';
+import '../services/api_client.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -23,7 +30,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _portfolioController = TextEditingController();
   String? _selectedCategory = 'Teknologi & IT';
   String? _uploadedCvName; // Nama file CV yang diunggah
-  
+  Uint8List? _cvBytes; // Isi file CV yang dipilih
+
   final List<String> _categories = [
     'Tugas & Akademik',
     'Desain & Multimedia',
@@ -31,7 +39,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     'Penulisan & Konten',
     'Jasa Rumah Tangga',
     'Les & Bimbingan',
-    'Lainnya'
+    'Lainnya',
   ];
 
   String _selectedRole = 'customer';
@@ -50,20 +58,66 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _simulateUploadCv() {
-    // Simulasi pemilihan file dokumen CV
-    setState(() {
-      final name = _usernameController.text.trim().isNotEmpty 
-          ? _usernameController.text.trim().replaceAll(' ', '_') 
-          : 'Mitra';
-      _uploadedCvName = 'CV_Portofolio_$name.pdf';
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Berkas "$_uploadedCvName" berhasil dilampirkan!'),
-        backgroundColor: AppColors.hijauSukses,
-      ),
-    );
+  Future<void> _pickCv() async {
+    try {
+      final List<PlatformFile> result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const [
+          'pdf',
+          'doc',
+          'docx',
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+        ],
+      );
+
+      if (result.isEmpty) return;
+
+      final file = result.single;
+
+      // Membaca isi file
+      final bytes = await file.readAsBytes();
+
+      if (bytes.isEmpty) return;
+
+      // Validasi ukuran maksimal 10 MB
+      if (bytes.length > 10 * 1024 * 1024) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ukuran berkas maksimal 10 MB.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _uploadedCvName = file.name;
+        _cvBytes = bytes;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Berkas "$_uploadedCvName" berhasil dilampirkan!'),
+          backgroundColor: AppColors.hijauSukses,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal memilih berkas: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _handleRegister() async {
@@ -72,7 +126,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_selectedRole == 'penyedia' && _uploadedCvName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Silakan upload berkas CV / Sertifikat Bukti Pekerjaan terlebih dahulu!'),
+          content: Text(
+            'Silakan upload berkas CV / Sertifikat Bukti Pekerjaan terlebih dahulu!',
+          ),
           backgroundColor: Colors.orange,
         ),
       );
@@ -81,30 +137,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isLoading = true);
 
-    bool success = false;
-    if (_selectedRole == 'penyedia') {
-      success = await AuthService().registerPenyedia(
-        username: _usernameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-        phone: _phoneController.text.trim(),
-        category: _selectedCategory ?? 'Lainnya',
-        portfolioText: _portfolioController.text.trim(),
-        cvFileName: _uploadedCvName ?? 'CV_Dokumen.pdf',
-      );
-    } else {
-      success = await AuthService().register(
-        _usernameController.text.trim(),
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-        _phoneController.text.trim(),
-        _selectedRole,
-      );
+    String? errorMessage;
+    try {
+      if (_selectedRole == 'penyedia') {
+        await AuthService().registerPenyedia(
+          username: _usernameController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+          phone: _phoneController.text.trim(),
+          category: _selectedCategory ?? 'Lainnya',
+          portfolioText: _portfolioController.text.trim(),
+          cvFileName: _uploadedCvName ?? 'CV_Dokumen.pdf',
+          cvBytes: _cvBytes,
+        );
+      } else {
+        await AuthService().register(
+          username: _usernameController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+          phone: _phoneController.text.trim(),
+        );
+      }
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+    } catch (_) {
+      errorMessage = 'Terjadi kesalahan. Coba lagi.';
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (!mounted) return;
+    final success = errorMessage == null;
 
     if (success) {
       if (_selectedRole == 'penyedia') {
@@ -117,7 +180,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Icon(Icons.hourglass_bottom, color: Colors.orange, size: 28),
                 SizedBox(width: 8),
                 Expanded(
-                  child: Text('Pendaftaran Diajukan!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.biruNavy)),
+                  child: Text(
+                    'Pendaftaran Diajukan!',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppColors.biruNavy,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -131,8 +201,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Navigator.pop(ctx);
                   Navigator.pop(context); // Kembali ke login
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.biruNavy),
-                child: const Text('OK, Mengerti', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.biruNavy,
+                ),
+                child: const Text(
+                  'OK, Mengerti',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -148,10 +223,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email sudah terdaftar. Gunakan email lain.'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
       );
     }
   }
@@ -171,7 +243,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      SizedBox(height: MediaQuery.of(context).size.height * 0.04),
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.04,
+                      ),
                       Image.asset('assets/logo.png', height: 70),
                       const SizedBox(height: 12),
                       const Text(
@@ -184,7 +258,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        isPenyedia 
+                        isPenyedia
                             ? 'Lengkapi data verifikasi & berkas keahlian mitra'
                             : 'Pilih role dan isi data diri Anda',
                         style: const TextStyle(
@@ -200,15 +274,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(30),
-                            border: Border.all(color: AppColors.biruNavy, width: 1.5),
+                            border: Border.all(
+                              color: AppColors.biruNavy,
+                              width: 1.5,
+                            ),
                           ),
                           child: Row(
                             children: [
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () => setState(() => _selectedRole = 'customer'),
+                                  onTap: () => setState(
+                                    () => _selectedRole = 'customer',
+                                  ),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: _selectedRole == 'customer'
                                           ? AppColors.biruNavy
@@ -216,7 +297,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       borderRadius: BorderRadius.circular(28),
                                     ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Icon(
                                           Icons.person,
@@ -242,9 +324,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () => setState(() => _selectedRole = 'penyedia'),
+                                  onTap: () => setState(
+                                    () => _selectedRole = 'penyedia',
+                                  ),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: _selectedRole == 'penyedia'
                                           ? AppColors.biruNavy
@@ -252,7 +338,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       borderRadius: BorderRadius.circular(28),
                                     ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Icon(
                                           Icons.handyman,
@@ -284,9 +371,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                       // Basic Info Fields
                       CustomTextField(
-                        hintText: isPenyedia ? 'Nama Lengkap / Nama Bisnis' : 'Username',
+                        hintText: isPenyedia
+                            ? 'Nama Lengkap / Nama Bisnis'
+                            : 'Username',
                         controller: _usernameController,
-                        prefixIcon: const Icon(Icons.person_outline, color: AppColors.biruNavy),
+                        prefixIcon: const Icon(
+                          Icons.person_outline,
+                          color: AppColors.biruNavy,
+                        ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Nama tidak boleh kosong';
@@ -301,7 +393,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hintText: 'Email',
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        prefixIcon: const Icon(Icons.email_outlined, color: AppColors.biruNavy),
+                        prefixIcon: const Icon(
+                          Icons.email_outlined,
+                          color: AppColors.biruNavy,
+                        ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Email tidak boleh kosong';
@@ -316,7 +411,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hintText: 'Nomor WhatsApp / HP',
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
-                        prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.biruNavy),
+                        prefixIcon: const Icon(
+                          Icons.phone_outlined,
+                          color: AppColors.biruNavy,
+                        ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Nomor telepon wajib diisi untuk verifikasi';
@@ -328,23 +426,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       // KHUSUS PENYEDIA: Form Keahlian & Upload CV
                       if (isPenyedia) ...[
                         Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 8,
+                          ),
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: AppColors.biruMuda.withOpacity(0.35),
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.biruNavy.withOpacity(0.2)),
+                            border: Border.all(
+                              color: AppColors.biruNavy.withOpacity(0.2),
+                            ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: const [
-                                  Icon(Icons.verified_outlined, color: AppColors.biruNavy, size: 20),
+                                  Icon(
+                                    Icons.verified_outlined,
+                                    color: AppColors.biruNavy,
+                                    size: 20,
+                                  ),
                                   SizedBox(width: 8),
                                   Text(
                                     'Kualifikasi & Dokumen Mitra',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.biruNavy),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: AppColors.biruNavy,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -358,10 +469,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   filled: true,
                                   fillColor: Colors.white,
                                   border: OutlineInputBorder(),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 12,
+                                  ),
                                 ),
-                                items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
-                                onChanged: (val) => setState(() => _selectedCategory = val),
+                                items: _categories
+                                    .map(
+                                      (c) => DropdownMenuItem(
+                                        value: c,
+                                        child: Text(
+                                          c,
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (val) =>
+                                    setState(() => _selectedCategory = val),
                               ),
                               const SizedBox(height: 12),
 
@@ -378,7 +503,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   alignLabelWithHint: true,
                                 ),
                                 validator: (val) {
-                                  if (isPenyedia && (val == null || val.isEmpty)) {
+                                  if (isPenyedia &&
+                                      (val == null || val.isEmpty)) {
                                     return 'Jelaskan riwayat pengalaman/portofolio Anda';
                                   }
                                   return null;
@@ -388,52 +514,78 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                               // Upload CV Box
                               GestureDetector(
-                                onTap: _simulateUploadCv,
+                                onTap: _pickCv,
                                 child: Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: _uploadedCvName != null ? AppColors.hijauSukses : AppColors.biruNavy.withOpacity(0.3),
+                                      color: _uploadedCvName != null
+                                          ? AppColors.hijauSukses
+                                          : AppColors.biruNavy.withOpacity(0.3),
                                       width: 1.5,
                                     ),
                                   ),
                                   child: Row(
                                     children: [
                                       Icon(
-                                        _uploadedCvName != null ? Icons.check_circle : Icons.upload_file,
-                                        color: _uploadedCvName != null ? AppColors.hijauSukses : AppColors.biruNavy,
+                                        _uploadedCvName != null
+                                            ? Icons.check_circle
+                                            : Icons.upload_file,
+                                        color: _uploadedCvName != null
+                                            ? AppColors.hijauSukses
+                                            : AppColors.biruNavy,
                                         size: 28,
                                       ),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               _uploadedCvName ?? 'Unggah Berkas CV / Sertifikat (PDF)',
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 12,
-                                                color: _uploadedCvName != null ? AppColors.hijauSukses : AppColors.biruNavy,
+                                                color: _uploadedCvName != null
+                                                    ? AppColors.hijauSukses
+                                                    : AppColors.biruNavy,
                                               ),
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              _uploadedCvName != null ? 'Berkas berhasil dilampirkan' : 'Klik untuk memilih file CV/Portofolio',
-                                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                              _uploadedCvName != null
+                                                  ? 'Berkas berhasil dilampirkan'
+                                                  : 'Klik untuk memilih file CV/Portofolio',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey,
+                                              ),
                                             ),
                                           ],
                                         ),
                                       ),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: AppColors.biruNavy,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
-                                        child: const Text('Pilih', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                        child: const Text(
+                                          'Pilih',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -447,16 +599,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.amber.shade50,
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.amber.shade300),
+                                  border: Border.all(
+                                    color: Colors.amber.shade300,
+                                  ),
                                 ),
                                 child: const Row(
                                   children: [
-                                    Icon(Icons.info_outline, size: 16, color: Colors.amber),
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 16,
+                                      color: Colors.amber,
+                                    ),
                                     SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
                                         'Akun mitra memerlukan persetujuan (ACC) Admin sebelum dapat mulai menjual jasa.',
-                                        style: TextStyle(fontSize: 11, color: Colors.black87),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.black87,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -471,14 +632,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hintText: 'Password',
                         isPassword: _obscurePassword,
                         controller: _passwordController,
-                        prefixIcon: const Icon(Icons.lock_outline, color: AppColors.biruNavy),
+                        prefixIcon: const Icon(
+                          Icons.lock_outline,
+                          color: AppColors.biruNavy,
+                        ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: AppColors.biruNavy,
                           ),
                           onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
+                            setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            );
                           },
                         ),
                         validator: (value) {
@@ -495,14 +663,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hintText: 'Konfirmasi Password',
                         isPassword: _obscureConfirmPassword,
                         controller: _confirmPasswordController,
-                        prefixIcon: const Icon(Icons.lock_outline, color: AppColors.biruNavy),
+                        prefixIcon: const Icon(
+                          Icons.lock_outline,
+                          color: AppColors.biruNavy,
+                        ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                            _obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: AppColors.biruNavy,
                           ),
                           onPressed: () {
-                            setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                            setState(
+                              () => _obscureConfirmPassword =
+                                  !_obscureConfirmPassword,
+                            );
                           },
                         ),
                         validator: (value) {
@@ -525,8 +701,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleRegister,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: isPenyedia ? AppColors.kuningLogo : AppColors.biruNavy,
-                              disabledBackgroundColor: AppColors.biruNavy.withOpacity(0.6),
+                              backgroundColor: isPenyedia
+                                  ? AppColors.kuningLogo
+                                  : AppColors.biruNavy,
+                              disabledBackgroundColor: AppColors.biruNavy
+                                  .withOpacity(0.6),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30.0),
                               ),
@@ -541,9 +720,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     ),
                                   )
                                 : Text(
-                                    isPenyedia ? 'Ajukan Pendaftaran Mitra' : 'Buat Akun Customer',
+                                    isPenyedia
+                                        ? 'Ajukan Pendaftaran Mitra'
+                                        : 'Buat Akun Customer',
                                     style: TextStyle(
-                                      color: isPenyedia ? AppColors.biruNavy : AppColors.putih,
+                                      color: isPenyedia
+                                          ? AppColors.biruNavy
+                                          : AppColors.putih,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),

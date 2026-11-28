@@ -4,11 +4,43 @@ import '../utils/colors.dart';
 import '../utils/helpers.dart';
 import 'booking_screen.dart';
 import 'chat_detail_screen.dart';
+import '../services/auth_service.dart';
+import '../services/chat_service.dart';
+import '../services/api_client.dart';
+import '../widgets/jasa_image.dart';
 
 class JasaDetailScreen extends StatelessWidget {
   final JasaModel jasa;
 
   const JasaDetailScreen({Key? key, required this.jasa}) : super(key: key);
+
+  Future<void> _openChat(BuildContext context) async {
+    final me = AuthService().currentUser;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    if (me == null || me.role != 'customer') {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Fitur chat dengan penyedia hanya tersedia untuk akun customer.')),
+      );
+      return;
+    }
+
+    try {
+      final room = await ChatService().getOrCreateChatRoom(jasa.penyediaId);
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(
+            chatRoomId: room.id,
+            otherUserName: jasa.penyediaName,
+            receiverId: jasa.penyediaId,
+          ),
+        ),
+      );
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message), backgroundColor: Colors.red));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,10 +60,12 @@ class JasaDetailScreen extends StatelessWidget {
                   shadows: [Shadow(color: Colors.black, blurRadius: 2)],
                 ),
               ),
-              background: Container(
-                color: AppColors.biruNavy.withOpacity(0.8),
-                child: const Center(child: Icon(Icons.build, size: 80, color: Colors.white38)),
-              ),
+              background: (jasa.imageUrl != null && jasa.imageUrl!.isNotEmpty)
+                  ? JasaImage(url: jasa.imageUrl, width: double.infinity, height: 250)
+                  : Container(
+                      color: AppColors.biruNavy.withOpacity(0.8),
+                      child: const Center(child: Icon(Icons.build, size: 80, color: Colors.white38)),
+                    ),
             ),
           ),
           SliverToBoxAdapter(
@@ -206,17 +240,7 @@ class JasaDetailScreen extends StatelessWidget {
               Expanded(
                 flex: 1,
                 child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatDetailScreen(
-                          chatRoomId: 'temp',
-                          otherUserName: jasa.penyediaName,
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: () => _openChat(context),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.biruNavy),
                     padding: const EdgeInsets.symmetric(vertical: 16),

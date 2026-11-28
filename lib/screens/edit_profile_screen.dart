@@ -1,4 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:kami_kerjain/services/api_client.dart';
 import 'package:kami_kerjain/services/auth_service.dart';
 import 'package:kami_kerjain/utils/colors.dart';
 
@@ -20,6 +23,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _descriptionController;
 
   bool _isPenyedia = false;
+  bool _isSaving = false;
+  Uint8List? _newImageBytes;
+  String? _newImageName;
 
   @override
   void initState() {
@@ -45,11 +51,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  void _saveProfile() {
-    if (_formKey.currentState!.validate()) {
-      // In a real app, update user model via API
+  Future<void> _pickImage() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _newImageBytes = bytes;
+      _newImageName = picked.name;
+    });
+  }
+
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate() || _isSaving) return;
+
+    setState(() => _isSaving = true);
+    try {
+      await _authService.updateProfile(
+        username: _usernameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+        description: _isPenyedia ? _descriptionController.text.trim() : null,
+        imageBytes: _newImageBytes,
+        imageName: _newImageName,
+      );
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+        _newImageBytes = null;
+        _newImageName = null;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profil berhasil diperbarui')),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
       );
     }
   }
@@ -72,18 +115,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               Center(
                 child: Stack(
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 50,
                       backgroundColor: AppColors.biruMuda,
-                      child: Icon(Icons.person, size: 50, color: AppColors.biruNavy),
+                      backgroundImage: _newImageBytes != null
+                          ? MemoryImage(_newImageBytes!)
+                          : ((_authService.user?.profileImage ?? '').isNotEmpty
+                              ? NetworkImage(_authService.user!.profileImage!) as ImageProvider
+                              : null),
+                      child: (_newImageBytes == null && (_authService.user?.profileImage ?? '').isEmpty)
+                          ? const Icon(Icons.person, size: 50, color: AppColors.biruNavy)
+                          : null,
                     ),
                     Positioned(
                       bottom: 0,
                       right: 0,
                       child: GestureDetector(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Simulasi ganti foto')));
-                        },
+                        onTap: _pickImage,
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: const BoxDecoration(
@@ -133,12 +181,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _saveProfile,
+                  onPressed: _isSaving ? null : _saveProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.kuningLogo,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('Simpan Perubahan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.biruNavy)),
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.biruNavy),
+                        )
+                      : const Text('Simpan Perubahan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.biruNavy)),
                 ),
               ),
             ],
